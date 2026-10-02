@@ -709,7 +709,7 @@ function updateVisorCue() {
 }
 
 function updateDoze() {
-  if (visorCue || state === 'sleepy' || intro.active || pageNav.show || pageNav.anim || pageNav.drag || m.dragging) return;
+  if (visorCue || state === 'sleepy' || intro.active || pageNav.open || pageNav.show || pageNav.anim || pageNav.drag || m.dragging) return;   // never on the sheet
   if (performance.now() - lastActive < DOZE_MS) return;
   visorUpThen(() => { setState('sleepy'); dozed = true; }, { feel: false, doze: true });
 }
@@ -772,6 +772,7 @@ addEventListener('keydown', (e) => {
     endIntro();
     const key = STATES[n - 1].key;
     const go = () => { setState(key); haptic(key === 'greeting' ? 'success' : key === 'error' ? 'edge' : 'tap'); };
+    if (key === 'sleepy' && (pageNav.open || pageNav.show)) return;   // no sleeping while the sheet is open
     if (key === 'greeting' || key === 'sleepy') visorUpThen(go); else { visorCue = null; go(); }
   }
   if (e.key === 'v' || e.key === 'V') { toggleVisor(); haptic('tap'); }
@@ -858,31 +859,17 @@ function endGesture() {
 hit.addEventListener('pointerup', endGesture);
 hit.addEventListener('pointercancel', endGesture);
 
-// Three quick taps (each within TRIPLE_GAP of the last) put it to sleep. Taps
-// one and two still hop straight away, so a single tap never waits; the third
-// sends it to Sleepy instead (it settles to the floor, Zz). A tap wakes it.
-const TRIPLE_GAP = 450;   // ms between taps
-let taps = 0, lastTapAt = -1e9;
+// On Home a tap opens the sheet (asleep, it only wakes the bot). On the sheet
+// a tap is a hop — the bot never sleeps while its sheet is open (no triple-tap
+// sleep, no doze, key 6 ignored there); it greets and stays in Idle.
 function tap() {
   if (pageNav.anim || pageNav.show) return;                  // mid-transition
   if (!pageNav.open) {                                       // on Home: a tap opens the Orbi sheet —
-    taps = 0;
     if (state === 'sleepy') { setState('idle'); return; }    // …but only when awake: asleep, a tap just wakes it (the wake hop)
     visorCue = null;                                         // (a pending visor-then-sleep / greet doesn't follow it onto the sheet)
     goPage(true); return;
   }
-  if (state === 'sleepy') { taps = 0; setState('idle'); return; }
-  const now = performance.now();
-  taps = now - lastTapAt < TRIPLE_GAP ? taps + 1 : 1;
-  lastTapAt = now;
-  if (taps >= 3) {
-    taps = 0;
-    visorUpThen(() => {
-      setState('sleepy');
-      if (!m.airborne) haptic('land', 0.35);   // mid-hop, the drop to the floor plays its own landing
-    });
-    return;
-  }
+  if (state === 'sleepy') { setState('idle'); return; }      // (can't fall asleep here, but just in case)
   hop(2.6);
   m.nodV += 1.2;
 }
@@ -986,7 +973,8 @@ const SHOW = {
   c2: { cx: 188, cy: 702 },           // …and comes down vertically onto the bottom edge
   lean: { pitch: 0.32, roll: 0.28 },  // rad: face dips toward the fall, body leans into the curve
   zeta: 0.72, response: 0.48,         // the rise spring
-  spinMs: 640,                        // the 360° on the way up
+  spin: { zeta: 0.8, omega: 10 },     // the 360° on the way up: a spring from rest — winds up, whips round,
+                                      // face-on at ≈418 ms with a ≈5° overshoot (it was a 640 ms ease that started at full speed)
   lead: 35,                           // px the bot starts above the sheet's edge (closes as (1 − q)²)
   visorDelay: 140,                    // ms after settling before the visor flips open
   // (the hello waits for the visor to be fully up: VISOR_RAISE_MS; straight away if it's already up)
@@ -1025,7 +1013,7 @@ function goPage(open, { settle = false } = {}) {
   if (fromHome) {
     if (intro.active) endIntro();
     pageNav.restoreVisor = helmet.visorDown;
-    pageNav.show = { t0: performance.now(), last: 0, q: 0, qv: 0, landed: false, arrived: false };
+    pageNav.show = { t0: performance.now(), last: 0, q: 0, qv: 0, s: Math.PI * 2, sv: 0, landed: false, arrived: false };
   } else {
     pageNav.anim = { t0: performance.now(), ms: open ? PAGE_SETTLE : PAGE_OUT, p0: pageNav.p, lift0: pageNav.lift, v0: { ...view }, v1: open ? VIEW.page : VIEW.home, p1: open ? 1 : 0, pose0: { ...pageNav.pose } };
   }
@@ -1063,11 +1051,15 @@ function updateShow(now) {
   }
   if (!sh.landed) { sh.landed = true; sh.last = sh.t0 + SHOW.drop; haptic('land', 0.75); }
   // 2 · the rise: an under-damped spring carries the sheet (and the bot on it) up
+  //   …and the 360°: its own spring, from rest at a full turn to face-on
   const w = (2 * Math.PI) / SHOW.response, z = SHOW.zeta, H = 1 / 240;
+  const ws = SHOW.spin.omega, zs = SHOW.spin.zeta;
   for (let left = (now - sh.last) / 1000; left > 0; left -= H) {
     const h = Math.min(H, left);
     sh.qv += (w * w * (1 - sh.q) - 2 * z * w * sh.qv) * h;
     sh.q += sh.qv * h;
+    sh.sv += (-ws * ws * sh.s - 2 * zs * ws * sh.sv) * h;
+    sh.s += sh.sv * h;
   }
   sh.last = now;
   const q = sh.q, rise = ms - SHOW.drop;
@@ -1079,11 +1071,12 @@ function updateShow(now) {
   const k = 1 - easeOutCubicS(Math.min(1, rise / 260));                   // straighten up as it lifts
   pageNav.pose.pitch = SHOW.lean.pitch * k;
   pageNav.pose.roll = 0;
-  const sp = Math.min(1, rise / SHOW.spinMs);
-  m.spin = Math.PI * 2 * (1 - easeOutCubicS(sp)); m.spinV = 0;            // the 360° on the way up
+  // the real angular velocity goes to spinV, so the bot leans into the turn (as after a flick)
+  m.spin = sh.s; m.spinV = sh.sv;
   pageNav.p = q;
   placePage();
-  if (sp >= 1 && Math.abs(q - 1) < 0.002 && Math.abs(sh.qv) < 0.03) {     // settled
+  const spun = Math.abs(sh.s) < 0.02 && Math.abs(sh.sv) < 0.3;             // within ~1°, nearly still
+  if (spun && Math.abs(q - 1) < 0.002 && Math.abs(sh.qv) < 0.03) {         // settled
     pageNav.show = null; pageNav.p = 1; Object.assign(view, VIEW.page);
     m.spin = 0; m.spinV = 0; m.home = 0; m.homing = true; m.glideF = 0; spinDetent = 0;
     pageNav.pose.pitch = pageNav.pose.roll = 0;

@@ -128,20 +128,25 @@ scene.add(rim);
 // (r 30) is centred at (40, 37.5): 1 unit = 30 px, ball centre at (327, 681.5).
 // The camera keeps its lens, position and target; setViewOffset only moves and
 // crops the frustum so the resting ball lands on that point at that scale,
-// wherever the canvas sits (it now covers the screen, so the bot can travel
-// onto the Orbi sheet — `view` is where the ball is drawn, see goPage).
+// wherever the canvas sits. `view` is where the ball is drawn (see goPage).
+// The canvas is a small box (CANVAS_BOX) that travels with the ball — moved by
+// a compositor transform, not redrawn bigger — so iOS renders and composites
+// ~5× fewer pixels than a full-screen WebGL layer over a scrolling page.
 const VIEW = {
   home: { cx: 327, cy: 681.5, unit: 30 },        // 1068:81084 — 80×80 FAB at (287, 644)
   page: { cx: 188, cy: 235.25, unit: 45 },      // 1086:90432 in 1086:92697 — 120×120 at (128, 179): body r 45 at (60, 56.25)
 };
 const view = { ...VIEW.home };
+// room around the ball for hops, the dizzy orbit, Zz and the soft shadows, even
+// at the sheet's 45 px/unit: ±2.9 units across, 3.5 up, 2.7 down
+const CANVAS_BOX = { w: 260, h: 280, ax: 130, ay: 160 };
 const camDir = new THREE.Vector3();
 function resize() {
-  renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
+  renderer.setSize(CANVAS_BOX.w, CANVAS_BOX.h, false);
   frameView();
 }
 function frameView() {
-  const w = canvas.clientWidth, h = canvas.clientHeight;
+  const w = CANVAS_BOX.w, h = CANVAS_BOX.h;
   camera.clearViewOffset();
   camera.fov = FOV;
   camera.aspect = 1;
@@ -150,22 +155,22 @@ function frameView() {
   const full = view.unit * 2 * depth * Math.tan(THREE.MathUtils.degToRad(FOV / 2));
   const o = new THREE.Vector3().project(camera);
   const ox = (o.x + 1) / 2 * full, oy = (1 - o.y) / 2 * full;
-  // canvas box in Figma frame px (offsetLeft/Top round to whole px; the box sits at y 591.5)
-  const box = canvas.getBoundingClientRect(), frame = (canvas.offsetParent || document.body).getBoundingClientRect();
-  camera.setViewOffset(full, full, ox - (view.cx - (box.left - frame.left)), oy - (view.cy - (box.top - frame.top)), w, h);
+  // the box rides with the ball: the ball always sits at its anchor (ax, ay)
+  camera.setViewOffset(full, full, ox - CANVAS_BOX.ax, oy - CANVAS_BOX.ay, w, h);
+  canvas.style.transform = `translate3d(${(view.cx - CANVAS_BOX.ax).toFixed(2)}px, ${(view.cy - CANVAS_BOX.ay).toFixed(2)}px, 0)`;
 }
 addEventListener('resize', resize);
 resize();
 
 // ─── body geometry ────────────────────────────────────────────────────────
-const geometry = new THREE.SphereGeometry(R, 256, 192);
+const geometry = new THREE.SphereGeometry(R, 128, 96);   // (was 256×192: identical at ≤ 105 px radius, 4× fewer vertices)
 // rest direction = object-space unit normal; the face shader samples by it
 geometry.setAttribute('aRest', geometry.attributes.normal.clone());
 
 // ─── face texture ─────────────────────────────────────────────────────────
 // Canvas covers ±90 Figma px around the body centre (body radius = 120 px).
 const FACE_EXTENT = 0.75;
-const FACE_PX = 2048;
+const FACE_PX = 512;   // ≥ 3 texels per screen pixel even on the sheet; a blink re-uploads 1 MB, not 16 MB
 const S = FACE_PX / 180;
 const faceCanvas = document.createElement('canvas');
 faceCanvas.width = faceCanvas.height = FACE_PX;
@@ -230,6 +235,56 @@ function lerpFace(A, B, t) {
   };
 }
 
+// ─── WebKit-safe canvas blur / shadow ──────────────────────────────────────
+// iOS Safari and WKWebView expose CanvasRenderingContext2D.filter but ignore it
+// (blurs drew hard-edged), and a stroke drawn with a shadow loses its round caps
+// (the pill eyes came out square). Both are avoided by painting shapes sharp
+// into a scratch canvas and letting a canvas *shadow* do the soft part:
+//   blurFill  draws only the shadow of the scratch image (the image itself is
+//             placed off-canvas, its shadow offset back in place). Canvas
+//             shadows are Gaussian with σ = shadowBlur / 2, so this matches
+//             blur(σ); colour / alpha ride on shadowColor (× globalAlpha).
+//   the eyes  are stroked into the scratch with no shadow (round caps intact),
+//             then composited in place with the lip as the image's shadow.
+// Shadow offsets and blur are in device px; `box` limits the work to a region.
+const scratchFor = (() => {
+  const pool = new Map();
+  return (key, w, h) => {
+    let c = pool.get(key);
+    if (!c) { c = document.createElement('canvas'); pool.set(key, c); }
+    if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+    const x = c.getContext('2d');
+    x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, w, h);
+    x.shadowColor = 'transparent'; x.globalAlpha = 1; x.filter = 'none';
+    return [c, x];
+  };
+})();
+function blurFill(ctx, sigma, color, paint, box) {
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  const [c, s] = scratchFor('blur', W, H);
+  s.setTransform(ctx.getTransform());
+  s.fillStyle = s.strokeStyle = '#000';
+  paint(s);
+  const [bx, by, bw, bh] = box || [0, 0, W, H];
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.shadowColor = color; ctx.shadowBlur = 2 * sigma; ctx.shadowOffsetX = W + bw; ctx.shadowOffsetY = 0;
+  ctx.drawImage(c, bx, by, bw, bh, bx - W - bw, by, bw, bh);
+  ctx.restore();
+}
+
+let cheeks = null;
+function cheeksImage() {                            // the greeting blush, blurred once (face px, before FACE_DY)
+  if (cheeks) return cheeks;
+  cheeks = document.createElement('canvas');
+  cheeks.width = cheeks.height = FACE_PX;
+  const c = cheeks.getContext('2d');
+  blurFill(c, 3.5 * S, 'rgba(244,128,128,0.55)', (x) => {
+    for (const cx of [-61, 63]) { x.beginPath(); x.ellipse(X(cx), Y(29), 17 * S, 9 * S, 0, 0, Math.PI * 2); x.fill(); }
+  });
+  return cheeks;
+}
+
 function drawFace(spec, open = 1) {
   fctx.clearRect(0, 0, FACE_PX, FACE_PX);
   fctx.save();
@@ -238,13 +293,7 @@ function drawFace(spec, open = 1) {
   if (spec.cheeks > 0.01) {                          // greeting blush
     fctx.save();
     fctx.globalAlpha = spec.cheeks;
-    fctx.filter = `blur(${3.5 * S}px)`;
-    fctx.fillStyle = 'rgba(244,128,128,0.55)';
-    for (const cx of [-61, 63]) {
-      fctx.beginPath();
-      fctx.ellipse(X(cx), Y(29), 17 * S, 9 * S, 0, 0, Math.PI * 2);
-      fctx.fill();
-    }
+    fctx.drawImage(cheeksImage(), 0, 0);              // pre-blurred once, so a morph doesn't re-blur every frame
     fctx.restore();
   }
 
@@ -268,27 +317,35 @@ function drawFace(spec, open = 1) {
     for (const [x, y] of all) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
     const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
     const h = y1 - y0 + e.w;                         // visual height including the round caps
-    fctx.save();
+    // the eye, stroked sharp into a scratch canvas — no shadow, so WebKit keeps the round caps
+    const [ec, ex] = scratchFor('eye', FACE_PX, FACE_PX);
+    ex.setTransform(fctx.getTransform());
     // blink: squash the eye vertically about its centre (pill eyes only)
     const sq = lerp(1, Math.max(open, 5 / 62), spec.blink);
-    fctx.translate(0, Y(cy)); fctx.scale(1, sq); fctx.translate(0, -Y(cy));
-    // bottom lip — the 2px white drop shadow on the Figma eyes
-    fctx.shadowColor = `rgba(255,255,236,${(0.75 * spec.lip).toFixed(3)})`;
-    fctx.shadowOffsetY = 2 * S;
-    fctx.shadowBlur = 1.5 * S;
-    const g = fctx.createLinearGradient(0, Y(y0 - e.w / 2), 0, Y(y1 + e.w / 2));
+    ex.translate(0, Y(cy)); ex.scale(1, sq); ex.translate(0, -Y(cy));
+    const g = ex.createLinearGradient(0, Y(y0 - e.w / 2), 0, Y(y1 + e.w / 2));
     g.addColorStop(0, top);
     g.addColorStop(0.32, '#0c0c0c');
     g.addColorStop(1, '#000');
-    fctx.strokeStyle = g;
-    fctx.lineWidth = e.w * S;
-    fctx.lineCap = 'round';
-    fctx.lineJoin = 'round';
-    fctx.beginPath();
+    ex.strokeStyle = g;
+    ex.lineWidth = e.w * S;
+    ex.lineCap = 'round';
+    ex.lineJoin = 'round';
+    ex.beginPath();
     for (const pts of [e.a, e.b]) {
-      pts.forEach(([x, y], i) => (i ? fctx.lineTo(X(x), Y(y)) : fctx.moveTo(X(x), Y(y))));
+      pts.forEach(([x, y], i) => (i ? ex.lineTo(X(x), Y(y)) : ex.moveTo(X(x), Y(y))));
     }
-    fctx.stroke();
+    ex.stroke();
+    // composited in place, its bottom lip (the 2px white drop shadow on the Figma eyes) as the image's shadow
+    const m = (e.w / 2 + 4) * S;                     // eye box in device px (+ room for the lip)
+    const bx = Math.max(0, X(x0) - m), by = Math.max(0, Y(y0) + FACE_DY * S - m);
+    const bw = Math.min(FACE_PX - bx, X(x1) - X(x0) + 2 * m), bh = Math.min(FACE_PX - by, (y1 - y0) * S + 2 * m);
+    fctx.save();
+    fctx.setTransform(1, 0, 0, 1, 0, 0);
+    fctx.shadowColor = `rgba(255,255,236,${(0.75 * spec.lip).toFixed(3)})`;
+    fctx.shadowOffsetY = 2 * S;
+    fctx.shadowBlur = 1.5 * S;
+    fctx.drawImage(ec, bx, by, bw, bh, bx, by, bw, bh);
     fctx.restore();
     // glint
     const ga = 0.85 * k * THREE.MathUtils.clamp((open - 0.45) * 3, 0, 1);
@@ -296,11 +353,10 @@ function drawFace(spec, open = 1) {
       const hh = h * Math.max(open, 5 / 62);
       fctx.save();
       fctx.globalAlpha = ga;
-      fctx.filter = `blur(${0.6 * S}px)`;
-      fctx.fillStyle = '#fff';
-      fctx.beginPath();
-      fctx.roundRect(X(cx - e.w * 0.22 - 3), Y(cy - hh * 0.36), 6 * S, hh * 0.26 * S, 3 * S);
-      fctx.fill();
+      const gx = X(cx - e.w * 0.22 - 3), gy = Y(cy - hh * 0.36), gp = 0.6 * S * 3;
+      blurFill(fctx, 0.6 * S, '#fff', (c) => {
+        c.beginPath(); c.roundRect(gx, gy, 6 * S, hh * 0.26 * S, 3 * S); c.fill();
+      }, [Math.max(0, gx - gp), Math.max(0, gy + FACE_DY * S - gp), 6 * S + 2 * gp, hh * 0.26 * S + 2 * gp]);
       fctx.restore();
     }
   }
@@ -417,7 +473,7 @@ body.add(helmet.group);
 // the contact shadow stays on the ground line.
 const SHADOW_EXTENT = 2;
 function shadowSprite(draw) {
-  const size = 1024, k = size / (2 * SHADOW_EXTENT);
+  const size = 512, k = size / (2 * SHADOW_EXTENT);   // (≥ 1 texel per device px at the sheet's size)
   const c = document.createElement('canvas');
   c.width = c.height = size;
   const ctx = c.getContext('2d');
@@ -433,26 +489,22 @@ function shadowSprite(draw) {
   return mesh;
 }
 const bodyShadow = shadowSprite((ctx, k) => {
-  ctx.filter = `blur(${0.22 * k}px)`;              // Figma σ 0.15, softened ×1.5
-  ctx.fillStyle = 'rgba(0,0,0,0.4)';
-  ctx.beginPath();
-  ctx.arc(0, 0, R * k, 0, Math.PI * 2);              // offset applied in placeShadows
-  ctx.fill();
+  blurFill(ctx, 0.22 * k, 'rgba(0,0,0,0.4)', (c) => {   // Figma σ 0.15, softened ×1.5
+    c.beginPath(); c.arc(0, 0, R * k, 0, Math.PI * 2); c.fill();   // offset applied in placeShadows
+  });
 });
 const helmetShadow = shadowSprite((ctx, k) => {
-  ctx.filter = `blur(${0.11 * k}px)`;              // Figma σ 0.075, softened ×1.5
-  ctx.fillStyle = 'rgba(0,0,0,0.45)';
-  ctx.scale(k / 120, k / 120);
-  ctx.translate(-164, -158);                          // offset applied in placeShadows
-  ctx.fill(new Path2D(SHELL_PATH));
+  blurFill(ctx, 0.11 * k, 'rgba(0,0,0,0.45)', (c) => {  // Figma σ 0.075, softened ×1.5
+    c.scale(k / 120, k / 120);
+    c.translate(-164, -158);                            // offset applied in placeShadows
+    c.fill(new Path2D(SHELL_PATH));
+  });
 });
 const CONTACT_Y = HOVER_Y - 1.31;
 const contactShadow = shadowSprite((ctx, k) => {
-  ctx.filter = `blur(${0.08 * k}px)`;              // Figma σ 0.053, softened ×1.5
-  ctx.fillStyle = 'rgba(29,37,57,0.16)';
-  ctx.beginPath();
-  ctx.ellipse(0, 0, 0.507 * k, 0.08 * k, 0, 0, Math.PI * 2);
-  ctx.fill();
+  blurFill(ctx, 0.08 * k, 'rgba(29,37,57,0.16)', (c) => {   // Figma σ 0.053, softened ×1.5
+    c.beginPath(); c.ellipse(0, 0, 0.507 * k, 0.08 * k, 0, 0, Math.PI * 2); c.fill();
+  });
 });
 const toCam = new THREE.Vector3(), camUp = new THREE.Vector3(), qRoll = new THREE.Quaternion(), zAxis = new THREE.Vector3(0, 0, 1);
 let viewRoll = 0;                                     // the bot's on-screen roll this frame
@@ -799,7 +851,9 @@ function endGesture() {
   m.settlePending = Math.abs(off) > 0.1 || Math.abs(m.spinV) > 1;
   m.dragVel = 0;
   hit.classList.remove('grabbing');
-  if (g.moved < 6 && performance.now() - g.t < 300) tap();
+  // a tap = any touch that never locked into a drag (real fingers jitter a few px and
+  // can rest ~0.4 s), so no touch falls between "tap" and "drag" and gets lost
+  if (!g.axis && g.moved < AXIS_LOCK_PX && performance.now() - g.t < 500) tap();
 }
 hit.addEventListener('pointerup', endGesture);
 hit.addEventListener('pointercancel', endGesture);

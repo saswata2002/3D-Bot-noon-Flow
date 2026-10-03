@@ -5,14 +5,16 @@
    blurs in above. Six stops, one per brand colour.
      · drag the knob (or tap a stop): the fill follows the knob in the stop's
        colour, a tick at each stop, the name rolls over at each midpoint, and
-       the bot recolours live and watches the knob
-     · let go: it settles on the nearest stop (a flick carries on to the next)
+       the bot watches the knob
+     · let go: it settles on the nearest stop (a flick carries on to the next),
+       and that's the pick — the bot turns a full 360° and the colour swaps in
+       while its back is turned
      · tap anywhere else, wait ~2 s, or close the sheet: the slider shrinks back
        into the swatch, whose ring then turns to the new colour
    Every frame is one spring progress `p` (0 swatch … 1 slider) plus the knob's
    own spring; geometry is in composer px (375-wide frame), so a scaled
    screen only needs the pointer mapped through its rect.
-   main.js owns the bot side (api: themes, index, preview, commit, look, haptic). */
+   main.js owns the bot side (api: themes, index, choose, look, haptic). */
 
 const W = 327;                                   // .cmp box, styles.css
 const ICON = { cx: 219, cy: 72, d: 24 };         // the swatch's ring centre
@@ -92,7 +94,7 @@ export function mountColourPicker(api) {
     out.classList.remove('is-on');
   }
 
-  let idx = api.index, openIdx = idx;
+  let idx = api.index, chosen = idx;
   const morph = { x: 0, v: 0 };
   const knob = { x: stopX(idx), v: 0, target: stopX(idx) };
   let isOpen = false, drag = null, raf = 0, last = 0, closeTimer = 0, committed = true, edged = false;
@@ -102,7 +104,7 @@ export function mountColourPicker(api) {
 
   function open() {
     if (isOpen) return;
-    isOpen = true; committed = false; openIdx = idx;
+    isOpen = true; committed = false; chosen = idx;
     knob.x = knob.target = stopX(idx); knob.v = 0;
     names[nameFront].textContent = themes[idx].name;
     pk.classList.add('is-live'); cmp.classList.add('is-picking');
@@ -119,6 +121,7 @@ export function mountColourPicker(api) {
     isOpen = false; drag = null; edged = false;
     clearTimeout(closeTimer);
     knob.target = stopX(idx);
+    choose(idx);                                   // folded mid-drag: what it shows is what it gets
     cmp.classList.remove('is-picking');
     swatch.setAttribute('aria-expanded', 'false');
     pk.setAttribute('aria-hidden', 'true');
@@ -139,7 +142,12 @@ export function mountColourPicker(api) {
     track.setAttribute('aria-valuenow', String(i));
     track.setAttribute('aria-valuetext', themes[i].name);
     api.haptic('tick');
-    api.preview(i);
+  }
+  // the knob is headed for stop i: that's the pick (the bot turns 360° and changes)
+  function choose(i) {
+    if (i === chosen) return;
+    chosen = i;
+    api.choose(i);
   }
 
   function frame(now) {
@@ -153,11 +161,10 @@ export function mountColourPicker(api) {
     }
     render();
     if (isOpen) api.look(clamp((knob.x - END) / (TRACK.w - 2 * END) * 2 - 1, -1, 1));
-    // folded back: settle the swatch on the new colour, then let main.js save it / show it off
+    // folded back: the swatch's ring turns to the new colour
     if (!isOpen && !committed && morph.x < 0.12) {
       committed = true;
       setSwatch(idx, true);
-      api.commit(idx !== openIdx);
     }
     const still = Math.abs(morph.v) < 0.002 && Math.abs(morph.x - (isOpen ? 1 : 0)) < 0.001
       && Math.abs(knob.v) < 0.5 && Math.abs(knob.x - knob.target) < 0.05 && !drag;
@@ -248,6 +255,7 @@ export function mountColourPicker(api) {
     knobEl.classList.remove('is-held');
     const aim = d.moved ? knob.x + clamp(d.v, -1500, 1500) * 0.06 : d.x0;   // a flick carries on to the next stop
     knob.target = stopX(stopOf(aim));
+    choose(stopOf(aim));
     knob.v = d.moved ? clamp(d.v, -1500, 1500) : 0;
     edged = false;
     kick();
@@ -260,7 +268,9 @@ export function mountColourPicker(api) {
     const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
     if (!d) return;
     e.preventDefault();
-    knob.target = stopX(clamp(stopOf(knob.target) + d, 0, n - 1));
+    const i = clamp(stopOf(knob.target) + d, 0, n - 1);
+    knob.target = stopX(i);
+    choose(i);
     kick(); armIdle();
   });
   // anything else folds it away (the tap still does what it does)
@@ -281,7 +291,7 @@ export function mountColourPicker(api) {
     sync(i) {
       if (i === idx) return;
       const dir = i > idx ? 1 : -1;
-      idx = i;
+      idx = chosen = i;
       knob.x = knob.target = stopX(i);
       pk.style.setProperty('--c', themes[i].hex);
       setName(i, dir);

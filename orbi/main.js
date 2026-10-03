@@ -925,14 +925,20 @@ function cycleColour() {
   m.homing = false;
   hop(1.8);
 }
-// The picker's "ta-da": the same 360° + hop, with the colour already on (no swap).
-function twirl() {
+// The slider's pick: the same 360° + hop as C, the new colour swapping in while
+// its back is turned. A pick made before that swap rides the turn already under
+// way (no stacked turns); one made after it starts another turn.
+function spinToTheme(i) {
+  themeIdx = i;
+  try { localStorage.setItem('orbi.theme', String(i)); } catch {}
   if (intro.active) endIntro();
+  const next = toColors(THEMES[i]);
+  if (colourSpin.active && colourSpin.pending) { colourSpin.pending = next; return; }
   const TAU = Math.PI * 2;
   const base = colourSpin.active ? colourSpin.to : Math.round(m.spin / TAU) * TAU;
-  Object.assign(colourSpin, { active: true, t: 0, from: m.spin, to: base - TAU, pending: null });
+  Object.assign(colourSpin, { active: true, t: 0, from: m.spin, to: base - TAU, pending: next });
   m.homing = false;
-  hop(1.4);
+  hop(1.8);
 }
 function swapColourNow() {
   if (!colourSpin.pending) return;
@@ -1604,39 +1610,17 @@ scrim.addEventListener('click', () => { if (pageNav.open) goPage(false); });
 addEventListener('keydown', (e) => { if (e.key === 'Escape' && pageNav.open) goPage(false); });
 
 // ─── colour slider on the Orbi sheet (orbi/colour-picker.js) ──────────────
-// The composer's swatch morphs into a six-stop slider. Scrubbing recolours
-// the bot live (a little hop per stop) while it watches the knob; letting
-// the slider fold away saves the colour and, if it changed, the bot shows
-// it off with the 360° twirl.
+// The composer's swatch morphs into a six-stop slider. While it's open the
+// bot watches the knob; each colour the knob lands on (release, tap, flick)
+// turns the bot a full 360° and swaps the colour in mid-turn.
 picker = mountColourPicker({
   themes: THEMES.map((th) => ({ name: th.name, hex: '#' + themeColor(th, th.body).getHexString() })),
   get index() { return themeIdx; },
-  preview(i) {
-    if (i === themeIdx) return;
-    themeIdx = i;
-    themeTarget = toColors(THEMES[i]);
-    themeRate = 11;
-    if (!colourSpin.active) hop(0.55);
-  },
-  commit(changed) {
-    try { localStorage.setItem('orbi.theme', String(themeIdx)); } catch {}
-    themeRate = 7;
-    // (the tap that folded it may have nudged the sheet: the twirl waits for it to be still — dropped if it closes)
-    twirlAt = changed ? performance.now() : 0;
-  },
+  choose(i) { if (i !== themeIdx) { spinToTheme(i); haptic('pop'); } },
   // k: −1 (knob at the left end) … 1 (right end), null = let go
   look(k) { gazeLock = k == null ? null : { yaw: 0.3 * k, pitch: 0.2 }; },
   haptic,
 });
-
-let twirlAt = 0;
-function updateTwirlCue() {
-  if (!twirlAt) return;
-  if (!pageNav.open || performance.now() - twirlAt > 600) { twirlAt = 0; return; }
-  if (pageNav.anim || pageNav.drag || pageNav.show) return;
-  twirlAt = 0;
-  twirl(); haptic('success');
-}
 
 // ─── frame loop ───────────────────────────────────────────────────────────
 const clock = new THREE.Clock();
@@ -1820,7 +1804,6 @@ function update(dt) {
   else m.hoverY = HOVER_Y + Math.sin(t * 1.6) * (state === 'working' ? 0.02 : 0.05);
 
   updateIntro(dt);
-  updateTwirlCue();
   updateColourSpin(dt);
   acc += dt;
   while (acc >= H) { stepMotion(H); acc -= H; }

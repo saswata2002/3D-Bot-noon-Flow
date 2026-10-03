@@ -141,6 +141,14 @@ const view = { ...VIEW.home };
 // at the sheet's 45 px/unit: ±2.9 units across, 3.5 up, 2.7 down
 const CANVAS_BOX = { w: 260, h: 280, ax: 130, ay: 160 };
 const camDir = new THREE.Vector3();
+// pick up + carry (see the pointer section): an offset from `view` and a lift
+const CARRY = {
+  holdMs: 280,                        // a still press this long picks the bot up
+  lift: 0.08,                         // picked up: 8 % bigger
+  omega: 13, zeta: 0.7,               // release: a spring home — one gentle overshoot (≈5 % of the distance), ~0.7 s
+  maxFling: 2400,                     // px/s of throw carried into the spring
+};
+const carry = { active: false, back: false, x: 0, y: 0, vx: 0, vy: 0, lift: 0, fx0: 0, fy0: 0, ox0: 0, oy0: 0, far: false };
 function resize() {
   renderer.setSize(CANVAS_BOX.w, CANVAS_BOX.h, false);
   frameView();
@@ -152,12 +160,13 @@ function frameView() {
   camera.aspect = 1;
   camera.updateProjectionMatrix();
   const depth = -camera.position.dot(camera.getWorldDirection(camDir));   // view depth of the ball centre
-  const full = view.unit * 2 * depth * Math.tan(THREE.MathUtils.degToRad(FOV / 2));
+  const unit = view.unit * (1 + CARRY.lift * carry.lift);   // picked up: a touch bigger
+  const full = unit * 2 * depth * Math.tan(THREE.MathUtils.degToRad(FOV / 2));
   const o = new THREE.Vector3().project(camera);
   const ox = (o.x + 1) / 2 * full, oy = (1 - o.y) / 2 * full;
   // the box rides with the ball: the ball always sits at its anchor (ax, ay)
   camera.setViewOffset(full, full, ox - CANVAS_BOX.ax, oy - CANVAS_BOX.ay, w, h);
-  canvas.style.transform = `translate3d(${(view.cx - CANVAS_BOX.ax).toFixed(2)}px, ${(view.cy - CANVAS_BOX.ay).toFixed(2)}px, 0)`;
+  canvas.style.transform = `translate3d(${(view.cx + carry.x - CANVAS_BOX.ax).toFixed(2)}px, ${(view.cy + carry.y - CANVAS_BOX.ay).toFixed(2)}px, 0)`;
 }
 addEventListener('resize', resize);
 resize();
@@ -528,7 +537,7 @@ function placeShadows() {
   contactShadow.position.set(body.position.x, CONTACT_Y, 0);
   contactShadow.quaternion.copy(camera.quaternion);
   contactShadow.scale.setScalar((1 + Math.min(lift, 2) * 0.4) * intro.scale);
-  contactShadow.material.opacity = THREE.MathUtils.clamp(1 - lift * 0.45, 0, 1) * Math.min(1, intro.scale);
+  contactShadow.material.opacity = THREE.MathUtils.clamp(1 - lift * 0.45, 0, 1) * Math.min(1, intro.scale) * (1 - 0.75 * carry.lift);   // fades while picked up
   bodyShadow.visible = helmetShadow.visible = contactShadow.visible = body.visible;
 }
 
@@ -813,6 +822,7 @@ hit.addEventListener('pointermove', (e) => {
   const dt = Math.max(1, now - gesture.lt) / 1000;
   gesture.lx = e.clientX; gesture.ly = e.clientY; gesture.lt = now;
   gesture.moved = Math.max(gesture.moved, Math.hypot(e.clientX - gesture.x, e.clientY - gesture.y));
+  if (gesture.carried) { carryTo(e.clientX, e.clientY, dt); return; }   // picked up: it follows the finger
   if (!gesture.axis) {
     if (gesture.moved < AXIS_LOCK_PX) return;          // let taps stay taps
     const tx = e.clientX - gesture.x, ty = e.clientY - gesture.y;
@@ -845,6 +855,8 @@ function endGesture() {
   const g = gesture;
   gesture = null;
   m.dragging = false;
+  hit.classList.remove('grabbing');
+  if (g.carried) { releaseCarry(performance.now() - g.lt > 80); return; }   // (held still before letting go: no fling)
   // stale velocity (pointer held still before release) shouldn't fling it
   const idle = performance.now() - g.lt;
   m.spinV = idle > 80 ? 0 : THREE.MathUtils.clamp(m.dragVel, -14, 14);
@@ -858,6 +870,65 @@ function endGesture() {
 }
 hit.addEventListener('pointerup', endGesture);
 hit.addEventListener('pointercancel', endGesture);
+
+// ─── hold to pick up, drag to carry, let go to spring home ─────────────────
+// Press and hold the bot still for CARRY.holdMs and it's picked up: a pop, it
+// lifts 8 % and rises above the page. It then follows the finger 1:1 (kept on
+// screen), swinging with the hand — it leans into sideways moves and tips with
+// vertical ones — while its ground shadow fades. Let go and it springs back to
+// where it lives (the FAB on Home, its spot on the sheet), carrying the throw's
+// momentum into a bouncy spring, and lands with a soft bump. Quick swipes
+// without the hold still spin it / work the visor; a quick tap is still a tap.
+const screenEl = document.getElementById('screen');
+function startCarry(g) {
+  g.carried = true;
+  carry.active = true; carry.back = false; carry.far = false;
+  carry.fx0 = g.lx; carry.fy0 = g.ly; carry.ox0 = carry.x; carry.oy0 = carry.y;   // (can be caught mid-way home)
+  carry.vx = carry.vy = 0;
+  if (state === 'sleepy') setState('idle', { quiet: true });
+  visorCue = null;
+  canvas.classList.add('carrying'); hit.classList.add('carrying');
+  haptic('pop');
+}
+function carryTo(px, py, dt) {
+  const W = screenEl.clientWidth || 375, Hh = screenEl.clientHeight || 812, r = 34;   // keep the ball on screen
+  const tx = THREE.MathUtils.clamp(carry.ox0 + px - carry.fx0, r - view.cx, W - r - view.cx);
+  const ty = THREE.MathUtils.clamp(carry.oy0 + py - carry.fy0, 44 + r - view.cy, Hh - r - view.cy);
+  carry.vx += ((tx - carry.x) / dt - carry.vx) * 0.35;      // smoothed hand speed: the lean and the throw
+  carry.vy += ((ty - carry.y) / dt - carry.vy) * 0.35;
+  carry.x = tx; carry.y = ty;
+  if (Math.hypot(carry.x, carry.y) > 24) carry.far = true;
+}
+function releaseCarry(still) {
+  carry.active = false; carry.back = true;
+  const f = CARRY.maxFling;
+  carry.vx = still ? 0 : THREE.MathUtils.clamp(carry.vx, -f, f);
+  carry.vy = still ? 0 : THREE.MathUtils.clamp(carry.vy, -f, f);
+}
+function updateCarry(dt) {
+  const g = gesture;
+  if (g && !g.carried && !g.axis && g.moved < AXIS_LOCK_PX && performance.now() - g.t >= CARRY.holdMs
+      && !pageNav.show && !pageNav.anim && !pageNav.drag) startCarry(g);
+  const lifted = carry.active ? 1 : 0;
+  carry.lift += (lifted - carry.lift) * (1 - Math.exp(-dt * 16));
+  if (carry.back) {
+    const w = CARRY.omega, z = CARRY.zeta, H = 1 / 240;
+    const d0 = Math.hypot(carry.x, carry.y);
+    for (let left = dt; left > 0; left -= H) {
+      const h = Math.min(H, left);
+      carry.vx += (-w * w * carry.x - 2 * z * w * carry.vx) * h; carry.x += carry.vx * h;
+      carry.vy += (-w * w * carry.y - 2 * z * w * carry.vy) * h; carry.y += carry.vy * h;
+    }
+    const d1 = Math.hypot(carry.x, carry.y);
+    if (carry.far && d0 > 4 && d1 <= 4) { carry.far = false; haptic('land', 0.45); }   // home: a soft landing
+    if (d1 < 0.3 && Math.hypot(carry.vx, carry.vy) < 6 && carry.lift < 0.01) {
+      carry.back = false; carry.x = carry.y = carry.vx = carry.vy = 0; carry.lift = 0;
+      canvas.classList.remove('carrying'); hit.classList.remove('carrying');
+      frameView();                                          // land exactly on its spot
+    }
+  }
+  if (carry.active || carry.back || carry.lift > 0.001) frameView();
+}
 
 // On Home a tap opens the sheet (asleep, it only wakes the bot). On the sheet
 // a tap is a hop — the bot never sleeps while its sheet is open (no triple-tap
@@ -1330,6 +1401,7 @@ function statePose(st, t, st_t) {
 function update(dt) {
   updatePage();
   updateVisorCue();
+  updateCarry(dt);
   updateDoze();
   simT += dt;
   const t = simT;
@@ -1360,8 +1432,10 @@ function update(dt) {
   const pb = easeInOutCubic(poseBlend);
   const pv = pb < 1 ? statePose(prevState, t, prevStateTime) : cur;
   let yaw = gaze.yaw + look.yaw + lerp(pv.yaw, cur.yaw, pb);
-  let pitch = BASE_PITCH + gaze.pitch + look.pitch + pageNav.pose.pitch + lerp(pv.pitch, cur.pitch, pb);
-  let roll = pageNav.pose.roll + lerp(pv.roll, cur.roll, pb);
+  // carried / swinging home: it leans into sideways moves and tips with vertical ones
+  const carryRoll = THREE.MathUtils.clamp(-carry.vx * 0.00045, -0.32, 0.32), carryPitch = THREE.MathUtils.clamp(carry.vy * 0.00035, -0.26, 0.26);
+  let pitch = BASE_PITCH + gaze.pitch + look.pitch + pageNav.pose.pitch + carryPitch + lerp(pv.pitch, cur.pitch, pb);
+  let roll = pageNav.pose.roll + carryRoll + lerp(pv.roll, cur.roll, pb);
   const sway = lerp(pv.sway, cur.sway, pb);
   // lean into the spin like a ball rolling off a flick, plus landing wobble
   roll += THREE.MathUtils.clamp(-(m.dragging ? m.dragVel : m.spinV) * 0.012, -0.18, 0.18) - m.rock;
@@ -1426,4 +1500,4 @@ setState('idle', { quiet: true });
 requestAnimationFrame(frame);
 
 // small hook for automated checks
-window.orbi = { look, pageNav, get dozed() { return dozed; }, poke, goPage, view, setState, nudge, helmet, toggleVisor, advance: update, faceCanvas, intro, gaze, replay: () => { setState('idle', { quiet: true }); helmet.setVisorDown(false); syncVisor(); Object.assign(intro, { active: true, t: 0, scale: 0, greeted: false, popped: false }); }, get state() { return state; }, motion: m, renderer, scene, camera };
+window.orbi = { carry, look, pageNav, get dozed() { return dozed; }, poke, goPage, view, setState, nudge, helmet, toggleVisor, advance: update, faceCanvas, intro, gaze, replay: () => { setState('idle', { quiet: true }); helmet.setVisorDown(false); syncVisor(); Object.assign(intro, { active: true, t: 0, scale: 0, greeted: false, popped: false }); }, get state() { return state; }, motion: m, renderer, scene, camera };

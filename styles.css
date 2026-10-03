@@ -633,6 +633,9 @@ img.contain { object-fit: contain; }
 /* while the Orbi sheet is open (or animating) the bot sits above it, as the matched Smart Animate layer */
 .orbi.on-page { z-index: 31; }
 .orbi-hit.on-page { z-index: 32; }
+/* picked up and carried (hold + drag): above everything in the flow until it's home again */
+.orbi.carrying { z-index: 33; }
+.orbi-hit.carrying { z-index: 34; }
 .orbi-hit { position: absolute; left: 287px; top: 644px; width: 80px; height: 80px; z-index: 16; cursor: grab; touch-action: none; -webkit-tap-highlight-color: transparent; }
 .orbi-hit.grabbing { cursor: grabbing; }
 

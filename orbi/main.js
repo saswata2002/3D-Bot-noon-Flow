@@ -145,7 +145,7 @@ const camDir = new THREE.Vector3();
 // pick up + carry (see the pointer section): an offset from `view` and a lift
 const CARRY = {
   holdMs: 280,                        // a still press this long picks the bot up
-  lift: 0.08,                         // picked up: 8 % bigger
+  lift: 0.1,                          // picked up: 80 → 88 (Figma 1096:112825), 10 % bigger
   omega: 13, zeta: 0.7,               // release: a spring home — one gentle overshoot (≈5 % of the distance), ~0.7 s
   maxFling: 2400,                     // px/s of throw carried into the spring
 };
@@ -512,8 +512,8 @@ body.add(helmet.group);
 // the drop shadows sit just behind the bot (scaled to stay the same on screen),
 // the contact shadow stays on the ground line.
 const SHADOW_EXTENT = 2;
-function shadowSprite(draw) {
-  const size = 512, k = size / (2 * SHADOW_EXTENT);   // (≥ 1 texel per device px at the sheet's size)
+function shadowSprite(draw, extent = SHADOW_EXTENT) {
+  const size = 512, k = size / (2 * extent);   // (≥ 1 texel per device px at the sheet's size)
   const c = document.createElement('canvas');
   c.width = c.height = size;
   const ctx = c.getContext('2d');
@@ -522,7 +522,7 @@ function shadowSprite(draw) {
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   const mesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(2 * SHADOW_EXTENT, 2 * SHADOW_EXTENT),
+    new THREE.PlaneGeometry(2 * extent, 2 * extent),
     new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, toneMapped: false }),
   );
   scene.add(mesh);
@@ -540,6 +540,15 @@ const helmetShadow = shadowSprite((ctx, k) => {
     c.fill(new Path2D(SHELL_PATH));
   });
 });
+// Held (Figma 1096:112825): the whole bot casts a big soft shadow — y +18, blur 24, #000 35% on the
+// 88 px frame (unit 33) → offset 0.545, σ 0.364 — the silhouette of ball + helmet shell, faded in by the lift
+const liftShadow = shadowSprite((ctx, k) => {
+  blurFill(ctx, 0.364 * k, 'rgba(0,0,0,0.35)', (c) => {
+    c.beginPath(); c.arc(0, 0, R * k, 0, Math.PI * 2); c.fill();
+    c.save(); c.scale(k / 120, k / 120); c.translate(-164, -158); c.fill(new Path2D(SHELL_PATH)); c.restore();
+  });
+}, 3);
+liftShadow.material.opacity = 0;
 const CONTACT_Y = HOVER_Y - 1.31;
 const contactShadow = shadowSprite((ctx, k) => {
   blurFill(ctx, 0.08 * k, 'rgba(29,37,57,0.16)', (c) => {   // Figma σ 0.053, softened ×1.5
@@ -548,7 +557,7 @@ const contactShadow = shadowSprite((ctx, k) => {
 });
 const toCam = new THREE.Vector3(), camUp = new THREE.Vector3(), qRoll = new THREE.Quaternion(), zAxis = new THREE.Vector3(0, 0, 1);
 let viewRoll = 0;                                     // the bot's on-screen roll this frame
-const DROP = [[bodyShadow, 0.183], [helmetShadow, 0.083]];   // Figma y offsets (units)
+const DROP = [[bodyShadow, 0.183], [helmetShadow, 0.083], [liftShadow, 0.545]];   // Figma y offsets (units)
 function placeShadows() {
   toCam.subVectors(camera.position, body.position).normalize();
   camUp.set(0, 1, 0).applyQuaternion(camera.quaternion);
@@ -568,8 +577,10 @@ function placeShadows() {
   contactShadow.position.set(body.position.x, CONTACT_Y, 0);
   contactShadow.quaternion.copy(camera.quaternion);
   contactShadow.scale.setScalar((1 + Math.min(lift, 2) * 0.4) * intro.scale);
-  contactShadow.material.opacity = THREE.MathUtils.clamp(1 - lift * 0.45, 0, 1) * Math.min(1, intro.scale) * (1 - 0.75 * carry.lift);   // fades while picked up
+  contactShadow.material.opacity = THREE.MathUtils.clamp(1 - lift * 0.45, 0, 1) * Math.min(1, intro.scale) * (1 - 0.45 * carry.lift);   // held: 55 % (Figma 1096:112827)
+  liftShadow.material.opacity = carry.lift * Math.min(1, intro.scale);   // only while held
   bodyShadow.visible = helmetShadow.visible = contactShadow.visible = body.visible;
+  liftShadow.visible = body.visible && carry.lift > 0.005;
 }
 
 // ─── props: dizzy orbit, Zz ───────────────────────────────────────────────
@@ -984,15 +995,15 @@ const TRASH = {
   tumble: 2.4,                        // rad/s of roll — it tumbles as it falls (plus a fast spin)
   spin: 18,                           // rad/s of turn
 };
-const trashAt = { x: 187.5, y: 742 };
+const trashAt = { x: 187.5, y: 693 };
 function showTrash(on) {
   if (!trashEl) return;
   carry.trash = on;
   if (on) {
     trashEl.classList.add('is-on');
-    // where the ✕ rests, in frame px (CSS: bottom centre, ring 64 px, 38 px up → centre 70 px above the bottom)
+    // where the target rests, in frame px — Figma 1098:14090, 64×64 at (155.5, 661): centre 119 px above the bottom
     trashAt.x = (screenEl.clientWidth || 375) / 2;
-    trashAt.y = (screenEl.clientHeight || 812) - 70;
+    trashAt.y = (screenEl.clientHeight || 812) - 119;
   } else {
     trashEl.classList.remove('is-on', 'is-armed', 'is-gulp');
     carry.armed = false;

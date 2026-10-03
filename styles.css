@@ -686,30 +686,39 @@ img.contain { object-fit: contain; }
   color: #666d85; text-align: center;
 }
 
-/* ══ Remove target — rises while the bot is held on Home (orbi/main.js) ══════
-   A dark fade for legibility, a frosted ✕ circle at the bottom centre and a
-   hint above it. Over it ("armed") the circle grows and brightens — it stays frosted, never red. */
-.orbi-trash {
-  position: absolute; left: 0; right: 0; bottom: 0; height: 230px; z-index: 32; pointer-events: none;
-  display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 12px; padding-bottom: 38px;
-  background: linear-gradient(to top, rgba(0,0,0,.5), rgba(0,0,0,.28) 45%, rgba(0,0,0,0));
-  opacity: 0; transform: translateY(40px);
-  transition: opacity .22s ease, transform .38s cubic-bezier(.32,.72,0,1);
-}
-.orbi-trash.is-on { opacity: 1; transform: none; }
-.orbi-trash__label {
-  font-family: var(--fig); font-weight: 600; font-size: 13px; line-height: 16px; letter-spacing: -0.1px;
-  color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.35);
-  transition: opacity .15s ease;
+/* ══ 1096:111182 Remove the bot — shown while it's held on Home (orbi/main.js) ══
+   1:1 with Figma, anchored to the bottom of the 812 frame:
+     Scrim        1100:115229  375×381 from y 431 — black 0 → .55 (35%) → .85 (70%) → .92
+     Drop target  1098:14090   64×64 at (155.5, 661): white 14%, 1.5px white 50% inside stroke,
+                               r 32, background blur 12 (CSS blur 6px); cross-circle icon 28 (white)
+     Drop label   1098:14091   "Drag here to remove", y 737: Noontree Medium 13/20, −0.1, white 90%
+   Over the target ("armed", not in the Figma state): the target grows and brightens. */
+.orbi-trash { position: absolute; inset: 0; z-index: 32; pointer-events: none; opacity: 0; transition: opacity .22s ease; }
+.orbi-trash.is-on { opacity: 1; }
+.orbi-trash__scrim {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 381px;
+  background: linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,.55) 35%, rgba(0,0,0,.85) 70%, rgba(0,0,0,.92) 100%);
 }
 .orbi-trash__ring {
-  width: 64px; height: 64px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center; color: #fff;
-  background: rgba(255,255,255,.2); box-shadow: inset 0 0 0 1px rgba(255,255,255,.4), 0 6px 18px rgba(0,0,0,.18);
-  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
-  transition: transform .28s cubic-bezier(.34,1.56,.64,1), background-color .18s ease, box-shadow .18s ease;
+  position: absolute; left: 50%; bottom: 87px; width: 64px; height: 64px; margin-left: -32px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 32px; background: rgba(255,255,255,.14); box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.5);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  transform: translateY(24px);
+  transition: transform .38s cubic-bezier(.32,.72,0,1), background-color .18s ease, box-shadow .18s ease;
 }
-.orbi-trash.is-armed .orbi-trash__ring { transform: scale(1.25); background: rgba(255,255,255,.32); box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.7), 0 8px 24px rgba(0,0,0,.22); }   /* armed: grows and brightens (no red) */
+.orbi-trash__ring svg { width: 28px; height: 28px; display: block; }
+.orbi-trash__label {
+  position: absolute; left: 0; right: 0; bottom: 55px; text-align: center;
+  font-family: var(--noon); font-weight: 500; font-size: 13px; line-height: 20px; letter-spacing: -0.1px;
+  color: rgba(255,255,255,.9); white-space: nowrap;
+  transform: translateY(24px); transition: transform .38s cubic-bezier(.32,.72,0,1);
+}
+.orbi-trash.is-on .orbi-trash__ring, .orbi-trash.is-on .orbi-trash__label { transform: none; }
+.orbi-trash.is-armed .orbi-trash__ring {
+  transform: scale(1.25); background: rgba(255,255,255,.26); box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.75);
+  transition-timing-function: cubic-bezier(.34,1.56,.64,1);
+}
 .orbi-trash.is-gulp .orbi-trash__ring { transform: scale(1.4); transition-duration: .16s; }
 /* the bot is gone: its canvas and touch target leave the flow */
 .orbi.is-removed, .orbi-hit.is-removed { display: none; }

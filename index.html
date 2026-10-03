@@ -526,10 +526,12 @@
   <p class="sheet__sub" data-node-id="1086:93480">Ask me to find products, track orders or reorder your essentials.</p>
 </section>
 
-<!-- Hold + drag the bot (on Home): a remove target rises at the bottom. Drop the bot on it and it leaves the frame. -->
+<!-- ══ 1096:111182 — remove the bot (Home, while it's held): Scrim 1100:115229, Drop target 1098:14090,
+     Drop label 1098:14091. Drop the bot on the target and it leaves the frame (orbi/main.js). ══ -->
 <div class="orbi-trash" id="orbiTrash" aria-hidden="true">
-  <span class="orbi-trash__label" id="orbiTrashLabel">Drag here to remove</span>
-  <span class="orbi-trash__ring"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><path d="M5 5l12 12M17 5L5 17" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></span>
+  <span class="orbi-trash__scrim" data-node-id="1100:115229"></span>
+  <span class="orbi-trash__ring" data-node-id="1098:14090"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true" data-node-id="1096:113334"><path d="M16.8813 9.88134C17.223 9.53963 17.7769 9.53964 18.1186 9.88134C18.4604 10.223 18.4604 10.7769 18.1186 11.1186L15.2373 14L18.1186 16.8813C18.4604 17.223 18.4604 17.7769 18.1186 18.1186C17.7769 18.4604 17.223 18.4604 16.8813 18.1186L14 15.2373L11.1186 18.1186C10.7769 18.4604 10.223 18.4604 9.88134 18.1186C9.53964 17.7769 9.53963 17.223 9.88134 16.8813L12.7627 14L9.88134 11.1186C9.53964 10.7769 9.53963 10.223 9.88134 9.88134C10.223 9.53963 10.7769 9.53964 11.1186 9.88134L14 12.7627L16.8813 9.88134Z" fill="white"/><path d="M23.625 14C23.625 8.68426 19.3157 4.375 14 4.375C8.68426 4.375 4.375 8.68426 4.375 14C4.375 19.3157 8.68426 23.625 14 23.625C19.3157 23.625 23.625 19.3157 23.625 14ZM25.375 14C25.375 20.2822 20.2822 25.375 14 25.375C7.71776 25.375 2.625 20.2822 2.625 14C2.625 7.71776 7.71776 2.625 14 2.625C20.2822 2.625 25.375 7.71776 25.375 14Z" fill="white"/></svg></span>
+  <span class="orbi-trash__label" id="orbiTrashLabel" data-node-id="1098:14091">Drag here to remove</span>
 </div>
 
 <!-- ══ 1068:81084 — Orbi Soft Idle + Helmet (80 × 80 at 287, 644): the 3D noon bot,

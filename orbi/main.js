@@ -148,7 +148,8 @@ const CARRY = {
   omega: 13, zeta: 0.7,               // release: a spring home — one gentle overshoot (≈5 % of the distance), ~0.7 s
   maxFling: 2400,                     // px/s of throw carried into the spring
 };
-const carry = { active: false, back: false, x: 0, y: 0, vx: 0, vy: 0, lift: 0, fx0: 0, fy0: 0, ox0: 0, oy0: 0, far: false };
+const carry = { active: false, back: false, x: 0, y: 0, vx: 0, vy: 0, lift: 0, fx0: 0, fy0: 0, ox0: 0, oy0: 0, far: false,
+  trash: false, armed: false, shrink: 1, removing: null, removed: false };
 function resize() {
   renderer.setSize(CANVAS_BOX.w, CANVAS_BOX.h, false);
   frameView();
@@ -160,7 +161,7 @@ function frameView() {
   camera.aspect = 1;
   camera.updateProjectionMatrix();
   const depth = -camera.position.dot(camera.getWorldDirection(camDir));   // view depth of the ball centre
-  const unit = view.unit * (1 + CARRY.lift * carry.lift);   // picked up: a touch bigger
+  const unit = view.unit * (1 + CARRY.lift * carry.lift) * carry.shrink;   // picked up: a touch bigger (over the remove target: smaller)
   const full = unit * 2 * depth * Math.tan(THREE.MathUtils.degToRad(FOV / 2));
   const o = new THREE.Vector3().project(camera);
   const ox = (o.x + 1) / 2 * full, oy = (1 - o.y) / 2 * full;
@@ -889,23 +890,86 @@ function startCarry(g) {
   visorCue = null;
   canvas.classList.add('carrying'); hit.classList.add('carrying');
   haptic('pop');
+  if (!pageNav.open) showTrash(true);                        // Home only: the remove target rises
 }
 function carryTo(px, py, dt) {
   const W = screenEl.clientWidth || 375, Hh = screenEl.clientHeight || 812, r = 34;   // keep the ball on screen
   const tx = THREE.MathUtils.clamp(carry.ox0 + px - carry.fx0, r - view.cx, W - r - view.cx);
   const ty = THREE.MathUtils.clamp(carry.oy0 + py - carry.fy0, 44 + r - view.cy, Hh - r - view.cy);
-  carry.vx += ((tx - carry.x) / dt - carry.vx) * 0.35;      // smoothed hand speed: the lean and the throw
-  carry.vy += ((ty - carry.y) / dt - carry.vy) * 0.35;
-  carry.x = tx; carry.y = ty;
+  let gx = tx, gy = ty;
+  if (carry.trash) {                                         // over the remove target: arm, and pull the bot onto it
+    const zx = trashAt.x - view.cx, zy = trashAt.y - view.cy, d = Math.hypot(tx - zx, ty - zy);
+    const armed = carry.armed ? d < TRASH.leave : d < TRASH.enter;
+    if (armed !== carry.armed) {
+      carry.armed = armed;
+      trashEl.classList.toggle('is-armed', armed);
+      trashLabel.textContent = armed ? 'Release to remove' : 'Drag here to remove';
+      haptic(armed ? 'snap' : 'tick');
+    }
+    if (armed) { gx = THREE.MathUtils.lerp(tx, zx, TRASH.magnet); gy = THREE.MathUtils.lerp(ty, zy, TRASH.magnet); }
+  }
+  carry.vx += ((gx - carry.x) / dt - carry.vx) * 0.35;      // smoothed hand speed: the lean and the throw
+  carry.vy += ((gy - carry.y) / dt - carry.vy) * 0.35;
+  carry.x = gx; carry.y = gy;
   if (Math.hypot(carry.x, carry.y) > 24) carry.far = true;
 }
 function releaseCarry(still) {
+  if (carry.armed) { removeBot(); return; }                  // dropped on the target: it leaves the frame
+  showTrash(false);
   carry.active = false; carry.back = true;
   const f = CARRY.maxFling;
   carry.vx = still ? 0 : THREE.MathUtils.clamp(carry.vx, -f, f);
   carry.vy = still ? 0 : THREE.MathUtils.clamp(carry.vy, -f, f);
 }
+// ─── drag to remove (Home) ─────────────────────────────────────────────────
+// While the bot is held on Home a remove target rises at the bottom. Within
+// TRASH.enter px of it the target arms (grows, turns red, "Release to remove",
+// a snap) and the bot is pulled onto it and shrinks; past TRASH.leave it
+// disarms (a tick). Let go armed and the bot is sucked in — it spins down to
+// nothing and drops out of the frame (a firm click), the target gulps and
+// slides away, and the bot is gone (rendering stops) until the page reloads.
+const trashEl = document.getElementById('orbiTrash');
+const trashLabel = document.getElementById('orbiTrashLabel');
+const TRASH = { enter: 64, leave: 84, magnet: 0.72, shrinkTo: 0.72, outMs: 340 };
+const trashAt = { x: 187.5, y: 742 };
+function showTrash(on) {
+  if (!trashEl) return;
+  carry.trash = on;
+  if (on) {
+    trashEl.classList.add('is-on');
+    // where the ✕ rests, in frame px (CSS: bottom centre, ring 64 px, 38 px up → centre 70 px above the bottom)
+    trashAt.x = (screenEl.clientWidth || 375) / 2;
+    trashAt.y = (screenEl.clientHeight || 812) - 70;
+  } else {
+    trashEl.classList.remove('is-on', 'is-armed', 'is-gulp');
+    carry.armed = false;
+    if (trashLabel) trashLabel.textContent = 'Drag here to remove';
+  }
+}
+function removeBot() {
+  carry.active = false; carry.armed = false;
+  carry.removing = { t0: performance.now(), x0: carry.x, y0: carry.y, s0: carry.shrink };
+  haptic('edge');
+  trashEl.classList.add('is-gulp');
+}
+function updateRemoval() {
+  const r = carry.removing, t = Math.min(1, (performance.now() - r.t0) / TRASH.outMs);
+  const e = t * t * t;                                       // ease-in: it gets sucked in, faster and faster
+  carry.shrink = r.s0 * (1 - e);
+  carry.y = r.y0 + 34 * e;                                   // down into the target, out of the frame
+  m.spin += 0.5;                                             // a quick spin as it goes
+  if (t < 1) return;
+  carry.removing = null; carry.removed = true;
+  canvas.classList.add('is-removed'); hit.classList.add('is-removed');
+  canvas.setAttribute('aria-hidden', 'true'); hit.setAttribute('aria-hidden', 'true');
+  trashEl.classList.remove('is-gulp', 'is-armed');
+  setTimeout(() => showTrash(false), 120);                   // the target slides away after the gulp
+}
+
 function updateCarry(dt) {
+  if (carry.removed) return;
+  if (carry.removing) { updateRemoval(); frameView(); return; }
+  carry.shrink += ((carry.armed ? TRASH.shrinkTo : 1) - carry.shrink) * (1 - Math.exp(-dt * 14));
   const g = gesture;
   if (g && !g.carried && !g.axis && g.moved < AXIS_LOCK_PX && performance.now() - g.t >= CARRY.holdMs
       && !pageNav.show && !pageNav.anim && !pageNav.drag) startCarry(g);
@@ -1399,6 +1463,7 @@ function statePose(st, t, st_t) {
 }
 
 function update(dt) {
+  if (carry.removed) return;                                 // removed via the drag-to-remove target: the bot is gone
   updatePage();
   updateVisorCue();
   updateCarry(dt);
@@ -1419,7 +1484,7 @@ function update(dt) {
   while (acc >= H) { stepMotion(H); acc -= H; }
   // a tick per 30° detent the user's turn passes (not the entry's 360°)
   const det = Math.round(m.spin / DETENT);
-  if (det !== spinDetent) { if (!intro.active && !pageNav.show) haptic('tick'); spinDetent = det; }
+  if (det !== spinDetent) { if (!intro.active && !pageNav.show && !carry.removing) haptic('tick'); spinDetent = det; }   // (scripted spins don't tick)
 
   // state-specific pose (self-driven — never from the cursor)
   updateLook(dt);
@@ -1490,6 +1555,7 @@ function update(dt) {
 }
 
 function frame() {
+  if (carry.removed) return;                                 // dropped on the remove target: nothing left to draw
   update(Math.min(clock.getDelta(), 1 / 30));
   renderer.render(scene, camera);
   requestAnimationFrame(frame);

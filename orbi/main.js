@@ -962,6 +962,9 @@ function carryTo(px, py, dt) {
       trashEl.classList.toggle('is-armed', armed);
       trashLabel.textContent = armed ? 'Release to remove' : 'Drag here to remove';
       haptic(armed ? 'snap' : 'tick');
+      // on the cross it gets angry (upstream's Angry: brows, frown, flush, shudder); off it, it calms down
+      if (armed) { if (state !== 'angry') setState('angry'); }
+      else if (state === 'angry') setState('idle', { quiet: true });
     }
     if (armed) { gx = THREE.MathUtils.lerp(tx, zx, TRASH.magnet); gy = THREE.MathUtils.lerp(ty, zy, TRASH.magnet); }
   }
@@ -982,10 +985,12 @@ function releaseCarry(still) {
 // While the bot is held on Home a remove target rises at the bottom. Within
 // TRASH.enter px of it the target arms (grows and brightens, "Release to remove",
 // a snap) and the bot is pulled onto it — at full size; past TRASH.leave it
-// disarms (a tick). Let go armed and the bot falls out of the frame at full
-// size (a firm click): a little pop up, then gravity takes it down through the
-// bottom edge, tumbling and spinning as it goes, while the target gulps and
-// slides away. The bot is gone (rendering stops) until the page reloads.
+// disarms (a tick). On the cross the bot turns Angry; off it, back to Idle.
+// Let go armed and the bot falls out of the frame at full size (a firm click):
+// a little pop up, then gravity takes it down through the bottom edge,
+// tumbling and spinning — and the cross circle falls with it, the same drop, so
+// they leave the frame together, while the label and scrim fade. The bot is
+// gone (rendering stops) until the page reloads.
 const trashEl = document.getElementById('orbiTrash');
 const trashLabel = document.getElementById('orbiTrashLabel');
 const TRASH = {
@@ -1005,16 +1010,17 @@ function showTrash(on) {
     trashAt.x = (screenEl.clientWidth || 375) / 2;
     trashAt.y = (screenEl.clientHeight || 812) - 119;
   } else {
-    trashEl.classList.remove('is-on', 'is-armed', 'is-gulp');
+    trashEl.classList.remove('is-on', 'is-armed');
     carry.armed = false;
     if (trashLabel) trashLabel.textContent = 'Drag here to remove';
   }
 }
+const trashRing = trashEl && trashEl.querySelector('.orbi-trash__ring');
 function removeBot() {
   carry.active = false; carry.armed = false;
   carry.removing = { t0: performance.now(), x0: carry.x, y0: carry.y, last: performance.now() };
   haptic('edge');
-  trashEl.classList.add('is-gulp');
+  trashEl.classList.add('is-falling');                       // the label + scrim fade; the ring is driven below
 }
 function updateRemoval() {
   const r = carry.removing, now = performance.now();
@@ -1023,13 +1029,16 @@ function updateRemoval() {
   carry.y = r.y0 + TRASH.pop * t + 0.5 * TRASH.gravity * t * t;   // pop, then falls out of the frame
   carry.tumble += TRASH.tumble * dt * (1 + 2 * t);           // tumbling faster as it drops
   m.spin += TRASH.spin * dt;
+  // the cross circle falls with it — the same drop, frame for frame — so they leave the frame together
+  if (trashRing) trashRing.style.transform = `translateY(${(carry.y - r.y0).toFixed(2)}px) scale(1.25) rotate(${(carry.tumble * 40).toFixed(1)}deg)`;
   const H = screenEl.clientHeight || 812, gone = view.cy + carry.y - view.unit * 2.2 > H;   // fully below the bottom edge
   if (!gone && t < 1.5) return;
   carry.removing = null; carry.removed = true;
   canvas.classList.add('is-removed'); hit.classList.add('is-removed');
   canvas.setAttribute('aria-hidden', 'true'); hit.setAttribute('aria-hidden', 'true');
-  trashEl.classList.remove('is-gulp', 'is-armed');
-  setTimeout(() => showTrash(false), 120);                   // the target slides away after the gulp
+  showTrash(false);
+  trashEl.classList.remove('is-falling');
+  if (trashRing) trashRing.style.transform = '';             // (hidden now; reset for the record)
 }
 
 function updateCarry(dt) {

@@ -686,6 +686,90 @@ img.contain { object-fit: contain; }
   color: #666d85; text-align: center;
 }
 
+/* ── Composer + Orbi's colour slider (not in the Figma frame; orbi/colour-picker.js) ──
+   A 327×100 card 12px in from the sheet's sides and bottom: "Ask Orbi anything", then
+   + · swatch · mic · voice (36px targets; the swatch's ring centre is at (219, 72), the
+   slider's track is 307×44 at (10, 46) — colour-picker.js ICON / TRACK). The script
+   drives the morph per frame (track box, knob, fill, the body's blur, the name's fade);
+   CSS only styles the pieces and the small state transitions. */
+.cmp {
+  position: absolute; left: 12px; bottom: 12px; width: 327px; height: 100px;
+  background: #fff; border-radius: 26px;
+  box-shadow: inset 0 0 0 1px #eceef3, 0 1px 2px rgba(29,37,57,.05), 0 8px 24px rgba(29,37,57,.06);
+  touch-action: none; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
+}
+.cmp__body { position: absolute; inset: 0; transform-origin: 50% 70%; }
+.cmp__ph {
+  position: absolute; left: 18px; top: 16px;
+  font-family: var(--noon); font-size: 15px; line-height: 20px; letter-spacing: -0.15px; color: #9ba0b1;
+}
+.cmp__btn, .cmp__voice {
+  position: absolute; bottom: 10px; width: 36px; height: 36px; padding: 0; margin: 0;
+  border: 0; border-radius: 18px; background: transparent; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .18s cubic-bezier(.32,.72,0,1), opacity .12s linear;
+}
+.cmp__btn svg, .cmp__voice svg { width: 20px; height: 20px; fill: none; stroke: #1d2539; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.cmp__btn:active, .cmp__voice:active { transform: scale(.88); }
+.cmp__plus { left: 8px; }
+.cmp__swatch { left: 201px; }
+.cmp__mic { left: 241px; }
+.cmp__voice { left: 281px; background: #feee00; }
+.cmp__voice svg { stroke-width: 2; }
+.cmp__swatch.is-pressed { transform: scale(.82); transition-duration: .12s; }
+/* the swatch: every colour in a ring (current one at the top) round a dot of the current one */
+.swatch__ring {
+  position: absolute; left: 6px; top: 6px; width: 24px; height: 24px; border-radius: 50%;
+  -webkit-mask: radial-gradient(circle, transparent 8.25px, #000 8.75px);
+          mask: radial-gradient(circle, transparent 8.25px, #000 8.75px);
+  transition: transform .62s cubic-bezier(.34,1.56,.64,1);
+}
+.swatch__dot {
+  position: absolute; left: 12.5px; top: 12.5px; width: 11px; height: 11px; border-radius: 50%;
+  box-shadow: inset 0 0 0 .5px rgba(29,37,57,.12);
+  transition: background-color .3s ease;
+}
+.swatch__ring.is-instant, .swatch__dot.is-instant { transition: none; }
+
+.cpk { position: absolute; inset: 0; pointer-events: none; visibility: hidden; }
+.cpk.is-live { visibility: visible; }
+.cmp.is-picking .cpk { pointer-events: auto; }
+.cmp.is-picking .cmp__body { pointer-events: none; }
+.cpk__label {
+  position: absolute; left: 0; right: 0; top: 14px; height: 22px; opacity: 0;
+  font-family: var(--noon); font-weight: 700; font-size: 16px; line-height: 22px; letter-spacing: -0.2px;
+  color: #1d2539; text-align: center;
+}
+.cpk__label span {
+  position: absolute; left: 0; right: 0; top: 0; white-space: nowrap;
+  opacity: 0; transform: translateY(var(--dy, -7px)); filter: blur(3px);
+  transition: opacity .2s ease, transform .26s cubic-bezier(.32,.72,0,1), filter .2s ease;
+}
+.cpk__label span.is-on { opacity: 1; transform: none; filter: none; }
+.cpk__label span.is-enter { transition: none; }
+.cpk__track {
+  position: absolute; left: 0; top: 0; width: 24px; height: 24px; border-radius: 22px; overflow: hidden;
+  background: #eef0f4; box-shadow: inset 0 1px 2px rgba(29,37,57,.08);
+  outline: none; touch-action: none; cursor: pointer; will-change: transform;
+}
+.cpk__fill {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 24px; border-radius: 22px;
+  background: var(--c, #feee00); transition: background-color .22s ease;
+}
+.cpk__dot {
+  position: absolute; top: 50%; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; border-radius: 50%;
+  background: var(--c); opacity: var(--dots, 0);
+  transition: background-color .16s ease;
+}
+.cpk__dot.is-in { background: rgba(255,255,255,.62); }
+.cpk__knob { position: absolute; left: 0; top: 0; width: 36px; height: 36px; pointer-events: none; }
+.cpk__knob i {
+  position: absolute; inset: 0; border-radius: 50%; background: #fff;
+  box-shadow: 0 0 0 .5px rgba(29,37,57,.06), 0 2px 6px rgba(29,37,57,.18), 0 1px 1.5px rgba(29,37,57,.12);
+  transition: transform .2s cubic-bezier(.32,.72,0,1);
+}
+.cpk__knob.is-held i { transform: scale(1.08); }
+
 /* ══ 1096:111182 Remove the bot — shown while it's held on Home (orbi/main.js) ══
    1:1 with Figma, anchored to the bottom of the 812 frame:
      Scrim        1100:115229  375×381 from y 431 — black 0 → .55 (35%) → .85 (70%) → .92

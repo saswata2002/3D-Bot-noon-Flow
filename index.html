@@ -524,6 +524,25 @@
 <section class="sheet" id="orbiSheet" role="dialog" aria-modal="true" aria-label="Orbi" aria-hidden="true" inert data-node-id="1086:92760">
   <h1 class="sheet__hi" data-node-id="1086:93479">Hi Saswata</h1>
   <p class="sheet__sub" data-node-id="1086:93480">Ask me to find products, track orders or reorder your essentials.</p>
+  <!-- Composer (not in the Figma frame): its swatch button morphs into Orbi's colour slider (orbi/colour-picker.js) -->
+  <div class="cmp" id="orbiCmp">
+    <div class="cmp__body">
+      <span class="cmp__ph">Ask Orbi anything</span>
+      <button class="cmp__btn cmp__plus" type="button" aria-label="Add"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4.25v11.5M4.25 10h11.5"/></svg></button>
+      <div class="cmp__right">
+        <button class="cmp__btn cmp__swatch" type="button" aria-label="Orbi's colour" aria-expanded="false"><span class="swatch__ring"></span><span class="swatch__dot"></span></button>
+        <button class="cmp__btn cmp__mic" type="button" aria-label="Dictate"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="7.25" y="2.75" width="5.5" height="9" rx="2.75"/><path d="M4.75 9.5a5.25 5.25 0 0 0 10.5 0M10 14.75v2.5"/></svg></button>
+        <button class="cmp__voice" type="button" aria-label="Talk to Orbi"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 8.25v3.5M8.5 5.5v9M11.5 7v6M14.5 8.5v3"/></svg></button>
+      </div>
+    </div>
+    <div class="cpk" aria-hidden="true">
+      <div class="cpk__label" aria-hidden="true"><span></span><span></span></div>
+      <div class="cpk__track" role="slider" tabindex="0" aria-label="Orbi's colour" aria-valuemin="0" aria-valuemax="5">
+        <span class="cpk__fill"></span>
+        <span class="cpk__knob"><i></i></span>
+      </div>
+    </div>
+  </div>
 </section>
 
 <!-- ══ 1096:111182 — remove the bot (Home, while it's held): Scrim 1100:115229, Drop target 1098:14090,

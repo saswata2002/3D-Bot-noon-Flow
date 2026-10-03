@@ -21,6 +21,7 @@
 
 import * as THREE from 'three';
 import { createHelmet, SURFACE_GLSL, SHELL_PATH } from './helmet.js';
+import { mountColourPicker } from './colour-picker.js';   // (this page: the sheet's colour slider)
 
 // ─── constants ────────────────────────────────────────────────────────────
 const R = 1;                    // body radius (Figma body = 240px → 120px = 1 unit)
@@ -904,8 +905,10 @@ function updateTheme(dt) {
   applyTheme();
 }
 // (upstream's swatch button lives in its state bar, which isn't brought over —
-// here the colour cycles with the C key)
-function syncColour() {}
+// here the colour is picked on the Orbi sheet's slider (orbi/colour-picker.js),
+// and C still cycles it; this keeps the slider's swatch in step)
+let picker = null;
+function syncColour() { if (picker) picker.sync(themeIdx); }
 // Changing colour turns the bot a full 360° (to its left, like the intro) with
 // a little hop; the new colour swaps in while it faces away, so it comes back
 // round already recoloured. Clicking again mid-turn adds another turn.
@@ -921,6 +924,15 @@ function cycleColour() {
   Object.assign(colourSpin, { active: true, t: 0, from: m.spin, to: base - TAU, pending: toColors(THEMES[themeIdx]) });
   m.homing = false;
   hop(1.8);
+}
+// The picker's "ta-da": the same 360° + hop, with the colour already on (no swap).
+function twirl() {
+  if (intro.active) endIntro();
+  const TAU = Math.PI * 2;
+  const base = colourSpin.active ? colourSpin.to : Math.round(m.spin / TAU) * TAU;
+  Object.assign(colourSpin, { active: true, t: 0, from: m.spin, to: base - TAU, pending: null });
+  m.homing = false;
+  hop(1.4);
 }
 function swapColourNow() {
   if (!colourSpin.pending) return;
@@ -1430,6 +1442,7 @@ function goPage(open, { settle = false } = {}) {
   if (pageNav.open === open && !pageNav.anim && !pageNav.drag && !pageNav.show) return;
   const fromHome = open && !settle && pageNav.p === 0 && !pageNav.anim && !pageNav.drag;
   pageNav.open = open; pageNav.drag = null; pageNav.show = null; pageNav.anim = null; pageNav.visorAt = 0; pageNav.greetAt = 0;
+  if (!open && picker) picker.close();
   if (fromHome) {
     if (intro.active) endIntro();
     pageNav.restoreVisor = helmet.visorDown;
@@ -1590,6 +1603,41 @@ scrim.addEventListener('pointerdown', () => { if (pageNav.open) haptic('tap'); }
 scrim.addEventListener('click', () => { if (pageNav.open) goPage(false); });
 addEventListener('keydown', (e) => { if (e.key === 'Escape' && pageNav.open) goPage(false); });
 
+// ─── colour slider on the Orbi sheet (orbi/colour-picker.js) ──────────────
+// The composer's swatch morphs into a six-stop slider. Scrubbing recolours
+// the bot live (a little hop per stop) while it watches the knob; letting
+// the slider fold away saves the colour and, if it changed, the bot shows
+// it off with the 360° twirl.
+picker = mountColourPicker({
+  themes: THEMES.map((th) => ({ name: th.name, hex: '#' + themeColor(th, th.body).getHexString() })),
+  get index() { return themeIdx; },
+  preview(i) {
+    if (i === themeIdx) return;
+    themeIdx = i;
+    themeTarget = toColors(THEMES[i]);
+    themeRate = 11;
+    if (!colourSpin.active) hop(0.55);
+  },
+  commit(changed) {
+    try { localStorage.setItem('orbi.theme', String(themeIdx)); } catch {}
+    themeRate = 7;
+    // (the tap that folded it may have nudged the sheet: the twirl waits for it to be still — dropped if it closes)
+    twirlAt = changed ? performance.now() : 0;
+  },
+  // k: −1 (knob at the left end) … 1 (right end), null = let go
+  look(k) { gazeLock = k == null ? null : { yaw: 0.3 * k, pitch: 0.2 }; },
+  haptic,
+});
+
+let twirlAt = 0;
+function updateTwirlCue() {
+  if (!twirlAt) return;
+  if (!pageNav.open || performance.now() - twirlAt > 600) { twirlAt = 0; return; }
+  if (pageNav.anim || pageNav.drag || pageNav.show) return;
+  twirlAt = 0;
+  twirl(); haptic('success');
+}
+
 // ─── frame loop ───────────────────────────────────────────────────────────
 const clock = new THREE.Clock();
 const euler = new THREE.Euler(0, 0, 0, 'YXZ');
@@ -1653,8 +1701,11 @@ const GLANCES = [               // [yaw, pitch]  (+yaw = its face turns right on
   [-0.2, 0], [0.2, 0], [-0.16, -0.12], [0.16, -0.12], [0, 0],
 ];
 const gaze = { yaw: 0, pitch: 0, vy: 0, vp: 0, ty: 0, tp: 0, i: -1, hold: 1.4 };
+let gazeLock = null;            // { yaw, pitch } while the colour slider is open: it watches the knob
 function updateGaze(dt) {
-  if (state === 'idle' && !m.dragging && !intro.active && !look.busy) {
+  if (gazeLock) {
+    gaze.ty = gazeLock.yaw; gaze.tp = gazeLock.pitch; gaze.i = -1; gaze.hold = 0.9;
+  } else if (state === 'idle' && !m.dragging && !intro.active && !look.busy) {
     gaze.hold -= dt;
     if (gaze.hold <= 0) {
       gaze.i = (gaze.i + 1) % GLANCES.length;
@@ -1666,7 +1717,7 @@ function updateGaze(dt) {
   } else {
     gaze.ty = 0; gaze.tp = 0; gaze.i = -1; gaze.hold = 0.9;        // back to centre; restart the loop later
   }
-  const K = 6, D = 2 * Math.sqrt(K);                  // critically damped: smooth, no overshoot
+  const K = gazeLock ? 70 : 6, D = 2 * Math.sqrt(K);  // critically damped: smooth, no overshoot (snappy when tracking the knob)
   gaze.vy += (K * (gaze.ty - gaze.yaw) - D * gaze.vy) * dt;
   gaze.yaw += gaze.vy * dt;
   gaze.vp += (K * (gaze.tp - gaze.pitch) - D * gaze.vp) * dt;
@@ -1769,6 +1820,7 @@ function update(dt) {
   else m.hoverY = HOVER_Y + Math.sin(t * 1.6) * (state === 'working' ? 0.02 : 0.05);
 
   updateIntro(dt);
+  updateTwirlCue();
   updateColourSpin(dt);
   acc += dt;
   while (acc >= H) { stepMotion(H); acc -= H; }

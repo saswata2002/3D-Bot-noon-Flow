@@ -688,7 +688,7 @@ img.contain { object-fit: contain; }
 
 /* ══ Remove target — rises while the bot is held on Home (orbi/main.js) ══════
    A dark fade for legibility, a frosted ✕ circle at the bottom centre and a
-   hint above it. Over it ("armed") the circle grows and turns iOS red. */
+   hint above it. Over it ("armed") the circle grows and brightens — it stays frosted, never red. */
 .orbi-trash {
   position: absolute; left: 0; right: 0; bottom: 0; height: 230px; z-index: 32; pointer-events: none;
   display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 12px; padding-bottom: 38px;
@@ -709,7 +709,7 @@ img.contain { object-fit: contain; }
   -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
   transition: transform .28s cubic-bezier(.34,1.56,.64,1), background-color .18s ease, box-shadow .18s ease;
 }
-.orbi-trash.is-armed .orbi-trash__ring { transform: scale(1.25); background: #ff3b30; box-shadow: inset 0 0 0 1px rgba(255,255,255,.25), 0 8px 24px rgba(255,59,48,.45); }
+.orbi-trash.is-armed .orbi-trash__ring { transform: scale(1.25); background: rgba(255,255,255,.32); box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.7), 0 8px 24px rgba(0,0,0,.22); }   /* armed: grows and brightens (no red) */
 .orbi-trash.is-gulp .orbi-trash__ring { transform: scale(1.4); transition-duration: .16s; }
 /* the bot is gone: its canvas and touch target leave the flow */
 .orbi.is-removed, .orbi-hit.is-removed { display: none; }

@@ -923,7 +923,7 @@ function releaseCarry(still) {
 }
 // ─── drag to remove (Home) ─────────────────────────────────────────────────
 // While the bot is held on Home a remove target rises at the bottom. Within
-// TRASH.enter px of it the target arms (grows, turns red, "Release to remove",
+// TRASH.enter px of it the target arms (grows and brightens, "Release to remove",
 // a snap) and the bot is pulled onto it and shrinks; past TRASH.leave it
 // disarms (a tick). Let go armed and the bot is sucked in — it spins down to
 // nothing and drops out of the frame (a firm click), the target gulps and

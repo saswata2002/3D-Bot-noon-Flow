@@ -858,6 +858,26 @@ addEventListener('keydown', (e) => {
 // through to the page.
 const AXIS_LOCK_PX = 8;
 const VISOR_SWIPE_PX = 35;
+// Pestering: four up/down swipes in quick succession (each within SWIPE_ANGRY.gap of the last) and the bot
+// gets Angry — a firm bump, the visor swings up if it's down (so the glare shows), then the Angry face for
+// SWIPE_ANGRY.holdS before it calms back to Idle. More swipes while it's angry restart the clock.
+const SWIPE_ANGRY = { count: 4, gap: 1200, holdS: 3.5 };
+let swipeTimes = [];
+function noteSwipe() {
+  const now = performance.now();
+  if (swipeTimes.length && now - swipeTimes[swipeTimes.length - 1] > SWIPE_ANGRY.gap) swipeTimes = [];   // too slow: start over
+  swipeTimes.push(now);
+  if (state === 'angry' && swipeAngry) { swipeAngry = now; scheduleCalm(); return; }   // still swiping: stays angry longer
+  if (swipeTimes.length < SWIPE_ANGRY.count) return;
+  swipeTimes = [];
+  haptic('edge');
+  visorUpThen(() => { swipeAngry = performance.now(); setState('angry'); scheduleCalm(); }, { feel: false });
+}
+let swipeAngry = 0;                                          // when the swipe-anger (re)started; 0 = not swipe-angry
+function scheduleCalm() {
+  const stamp = swipeAngry;
+  schedule(SWIPE_ANGRY.holdS, () => { if (state === 'angry' && swipeAngry === stamp) { swipeAngry = 0; setState('idle'); } });
+}
 const hit = document.getElementById('orbiHit') || canvas;
 let gesture = null;
 
@@ -898,6 +918,7 @@ hit.addEventListener('pointermove', (e) => {
       gesture.fired = true;
       if (helmet.visorDown !== (ty > 0)) haptic('tap');      // a click as the visor goes (not if it's already there)
       setVisor(ty > 0);
+      noteSwipe();                                            // pestered with swipes? (see SWIPE_ANGRY)
     }
     return;
   }

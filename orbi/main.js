@@ -914,9 +914,10 @@ function syncColour() { if (picker) picker.sync(themeIdx); }
 // round already recoloured. Clicking again mid-turn adds another turn.
 // (this page: the turn is one spring, not upstream's 0.95 s ease-out-back — that
 // overshot 16° and swung back, then handed a dead stop to the yaw spring. The
-// spring launches with a kick, is face-on in ≈275 ms with a ≈4° overshoot, and
-// rests at ≈610 ms, its velocity carried straight into the idle settle.)
-const COLOUR_SPIN = { omega: 15, zeta: 0.8, kick: 10, swapAt: 0.36 };   // swap once ~130° round (back to camera)
+// spring starts with a light push, is face-on in ≈480 ms with a ≈1° overshoot
+// (peak ≈1600°/s), and rests at ≈840 ms, its velocity carried straight into the
+// idle settle.)
+const COLOUR_SPIN = { omega: 11, zeta: 0.86, kick: 3, swapAt: 0.36 };   // swap once ~130° round (back to camera)
 const colourSpin = { active: false, t: 0, from: 0, to: 0, s: 0, sv: 0, pending: null };
 // aim the turn at `to`: a fresh turn launches with the kick; another turn added mid-spin keeps its speed
 function launchSpin(to, pending) {

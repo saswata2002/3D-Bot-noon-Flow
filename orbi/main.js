@@ -1029,6 +1029,8 @@ function updateRemoval() {
   const r = carry.removing, now = performance.now();
   const dt = Math.min(0.05, (now - r.last) / 1000);
   r.last = now;
+  const relax = Math.exp(-dt * 6);                           // the lean from the last drag eases out (no frozen tilt)
+  carry.vx *= relax; carry.vy *= relax;
   if (r.phase === 'wait') {
     // settles onto the cross while the visor goes up and the angry face comes in
     const zx = trashAt.x - view.cx, zy = trashAt.y - view.cy, k = 1 - Math.exp(-dt * 10);
@@ -1036,8 +1038,10 @@ function updateRemoval() {
     const ready = state === 'angry' && !morph && !visorCue && now - r.t0 >= TRASH.beat;
     if (!ready && now - r.t0 < 1800) return;
     r.phase = 'fall'; r.tf = now; r.y0 = carry.y;
+    scripts.length = 0;                                      // no angry huff-hop mid-fall
+    r.shake0 = m.shake;                                      // the angry shudder eases out as it goes
     haptic('edge');                                          // the firm click as it lets go of the cross
-    trashEl.classList.add('is-falling');                     // the label + scrim fade; the ring is driven below
+    trashEl.classList.add('is-falling');                     // the label + scrim ease out; the ring is driven below
     return;
   }
   // a gentle wind-up that eases to a stop, then a fall from rest — velocity is continuous throughout
@@ -1046,6 +1050,7 @@ function updateRemoval() {
   const tf = Math.max(0, tau - w);
   carry.y = r.y0 - lift + 0.5 * TRASH.gravity * tf * tf;
   carry.tumble = TRASH.tumble * tf * tf;                     // tips over more and more as it drops
+  m.shake = (r.shake0 || 0) * Math.max(0, 1 - tau / 0.25);
   m.spin += (TRASH.spin[0] + TRASH.spin[1] * tf) * dt;
   // the cross circle falls with it — the same drop, frame for frame — so they leave the frame together
   if (trashRing) trashRing.style.transform = `translateY(${(carry.y - r.y0).toFixed(2)}px) scale(1.25) rotate(${(carry.tumble * 40).toFixed(1)}deg)`;
@@ -1054,9 +1059,10 @@ function updateRemoval() {
   carry.removing = null; carry.removed = true;
   canvas.classList.add('is-removed'); hit.classList.add('is-removed');
   canvas.setAttribute('aria-hidden', 'true'); hit.setAttribute('aria-hidden', 'true');
-  showTrash(false);
-  trashEl.classList.remove('is-falling');
-  if (trashRing) trashRing.style.transform = '';             // (hidden now; reset for the record)
+  // everything has already left or faded: hide the whole remove UI in one step. (Resetting the ring /
+  // dropping .is-falling while it faded made the ✕ snap back and the label + scrim flash for a few frames.)
+  trashEl.classList.add('is-gone');
+  carry.trash = false; carry.armed = false;
 }
 
 function updateCarry(dt) {

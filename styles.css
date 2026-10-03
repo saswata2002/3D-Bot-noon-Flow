@@ -719,8 +719,14 @@ img.contain { object-fit: contain; }
   transform: scale(1.25); background: rgba(255,255,255,.26); box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.75);
   transition-timing-function: cubic-bezier(.34,1.56,.64,1);
 }
-/* released on the cross: the ring falls with the bot (JS drives its transform), the label and scrim fade */
-.orbi-trash.is-falling .orbi-trash__ring { transition: background-color .18s ease, box-shadow .18s ease; }
-.orbi-trash.is-falling .orbi-trash__label, .orbi-trash.is-falling .orbi-trash__scrim { opacity: 0; transition: opacity .6s ease .1s; }
+/* released on the cross: the ring falls with the bot (JS drives its transform, on its own layer); the label
+   drifts down as it fades, the scrim eases out over the fall (≈0.7 s), then the whole UI is hidden at once */
+.orbi-trash.is-falling .orbi-trash__ring { transition: none; will-change: transform; }
+.orbi-trash.is-falling .orbi-trash__label {
+  opacity: 0; transform: translateY(10px);
+  transition: opacity .38s cubic-bezier(.4,0,1,1), transform .45s cubic-bezier(.32,.72,0,1);
+}
+.orbi-trash.is-falling .orbi-trash__scrim { opacity: 0; transition: opacity .7s cubic-bezier(.33,0,.2,1) .05s; }
+.orbi-trash.is-gone { visibility: hidden; opacity: 0; transition: none; }
 /* the bot is gone: its canvas and touch target leave the flow */
 .orbi.is-removed, .orbi-hit.is-removed { display: none; }

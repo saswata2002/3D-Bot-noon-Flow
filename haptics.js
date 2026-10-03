@@ -9,6 +9,8 @@
      success notification — the entry greeting; Greeting state
      pop     medium impact @0.7 — the entry: Orbi reaching full size        (new)
      land    soft impact @intensity — a hop touching down, by impact speed  (new)
+     heavy   heavy impact @1 — the strongest single tap: each angry huff     (new)
+     error   error notification — the sharp triple buzz: turning Angry       (new)
    Channels, best first (only one plays):
    · a native host — window.webkit.messageHandlers.haptic (Vercel Sim and any
      WKWebView shell) → real UIFeedbackGenerators, during drags and animations too
@@ -23,8 +25,8 @@
 window.Haptics = (() => {
   const iOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const NATIVE = { tick: 'selection', snap: { type: 'medium', intensity: 0.8 }, edge: { type: 'rigid', intensity: 0.6 }, tap: 'light', success: 'success',
-    pop: { type: 'medium', intensity: 0.7 } };
-  const VIBE = { tick: 4, snap: 12, edge: 10, tap: 8, success: [10, 40, 16], pop: 12 };
+    pop: { type: 'medium', intensity: 0.7 }, heavy: { type: 'heavy', intensity: 1 }, error: 'error' };
+  const VIBE = { tick: 4, snap: 12, edge: 10, tap: 8, success: [10, 40, 16], pop: 12, heavy: 30, error: [22, 50, 22, 50, 34] };
   let label = null;
   const sw = () => {
     if (label && label.isConnected) return label;
@@ -42,7 +44,11 @@ window.Haptics = (() => {
   const IOS_HOLD_MS = 700;
   let iosHeld = null;
   const iosActive = () => !navigator.userActivation || navigator.userActivation.isActive;
-  const iosPlay = (kind) => { sw().click(); if (kind === 'success') setTimeout(() => sw().click(), 90); };
+  const iosPlay = (kind) => {
+    sw().click();
+    if (kind === 'success') setTimeout(() => sw().click(), 90);
+    if (kind === 'error') { setTimeout(() => sw().click(), 80); setTimeout(() => sw().click(), 160); }
+  };
   ['pointerup', 'touchend', 'click'].forEach((ev) => addEventListener(ev, () => {
     const h = iosHeld; iosHeld = null;
     if (h && performance.now() - h.t < IOS_HOLD_MS) try { iosPlay(h.kind); } catch (_) {}
@@ -71,7 +77,7 @@ window.Haptics = (() => {
     fire('land', { type: 'soft', intensity: +k.toFixed(2) }, Math.round(5 + 9 * k));
   };
   return { tick: () => fire('tick'), snap: () => fire('snap'), edge: () => fire('edge'), tap: () => fire('tap'),
-    success: () => fire('success'), pop: () => fire('pop'), land };
+    success: () => fire('success'), pop: () => fire('pop'), heavy: () => fire('heavy'), error: () => fire('error'), land };
 })();
 
 /* ── Page taps (the Product Upscale engine's tap listener, adapted to Home) ──

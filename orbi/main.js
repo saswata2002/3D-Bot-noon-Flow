@@ -800,10 +800,12 @@ function setState(next, { quiet = false } = {}) {
         // huff (hop + shake burst) every couple of seconds
         m.shake = 0.024;
         m.nodV += 1.4;
+        haptic('error');                                     // strong: the sharp triple buzz as it turns Angry
         schedule(0.4, () => { m.shake = 0.006; });
         const huff = () => {
           if (state !== 'angry') return;
           hop(1.7);
+          haptic('heavy');                                   // strong: every huff lands hard
           m.shake = 0.02;
           schedule(0.32, () => { if (state === 'angry') m.shake = 0.006; });
           schedule(2.2 + Math.random() * 0.8, huff);
@@ -838,7 +840,8 @@ addEventListener('keydown', (e) => {
   if (n >= 1 && n <= STATES.length) {
     endIntro();
     const key = STATES[n - 1].key;
-    const go = () => { setState(key); haptic(key === 'greeting' ? 'success' : key === 'error' || key === 'angry' ? 'edge' : 'tap'); };
+    // (Angry plays its own strong buzz from setState, so no key bump on top)
+    const go = () => { setState(key); if (key !== 'angry') haptic(key === 'greeting' ? 'success' : key === 'error' ? 'edge' : 'tap'); };
     if (key === 'sleepy' && (pageNav.open || pageNav.show)) return;   // no sleeping while the sheet is open
     if (key === 'greeting' || key === 'sleepy') visorUpThen(go); else { visorCue = null; go(); }
   }

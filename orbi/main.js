@@ -1086,6 +1086,50 @@ function updateRemoval() {
   carry.trash = false; carry.armed = false;
 }
 
+// ─── bring it back: three quick taps on the noon tile ─────────────────────
+// Once removed, three taps on the yellow "noon" marketplace tile (the first in
+// the header — tile or collapsed pill), each within RESTORE.gap of the last,
+// bring the bot back: everything from the removal is reset cleanly and it
+// replays its intro — grows in place at its Home spot with a 360° turn,
+// greets, settles, then lowers its visor. Not removed → the taps do nothing extra.
+const RESTORE = { taps: 3, gap: 500 };
+const noonTile = document.querySelector('.sw .tile[aria-label="noon"]');
+let noonTaps = [];
+if (noonTile) noonTile.addEventListener('click', () => {
+  if (!carry.removed) { noonTaps = []; return; }
+  const now = performance.now();
+  if (noonTaps.length && now - noonTaps[noonTaps.length - 1] > RESTORE.gap) noonTaps = [];
+  noonTaps.push(now);
+  if (noonTaps.length >= RESTORE.taps) { noonTaps = []; restoreBot(); }
+});
+function restoreBot() {
+  if (!carry.removed) return;
+  // the removal, undone
+  Object.assign(carry, { removed: false, removing: null, active: false, back: false, armed: false, trash: false,
+    x: 0, y: 0, vx: 0, vy: 0, lift: 0, tumble: 0, far: false });
+  canvas.classList.remove('is-removed', 'carrying'); hit.classList.remove('is-removed', 'carrying');
+  hit.removeAttribute('aria-hidden');                        // (the canvas itself is always decorative)
+  // the remove UI back to its resting (hidden) state — it isn't .is-on, so nothing flashes
+  trashEl.classList.remove('is-gone', 'is-falling', 'is-armed', 'is-on');
+  if (trashRing) trashRing.style.transform = '';
+  if (trashLabel) trashLabel.textContent = 'Drag here to remove';
+  // the bot itself, fresh at its Home spot
+  Object.assign(view, VIEW.home);
+  m.y = HOVER_Y; m.vy = 0; m.airborne = false; m.x = 0; m.vx = 0;
+  m.spin = 0; m.spinV = 0; m.home = 0; m.homing = true; m.glideF = 0; spinDetent = 0;
+  m.tilt = m.tiltV = 0; m.nod = m.nodV = 0; m.rock = m.rockV = 0; m.shake = 0;
+  swipeTimes = []; swipeAngry = 0; visorCue = null;
+  scripts.length = 0;
+  // …and its intro, from the top (as on page load)
+  setState('idle', { quiet: true });
+  helmet.setVisorDown(false);
+  Object.assign(intro, { active: true, t: 0, scale: 0, greeted: false, popped: false });
+  frameView();
+  poke();                                                    // (a fresh 10 s before it may doze)
+  clock.getDelta();                                          // no giant first step after the pause
+  requestAnimationFrame(frame);                              // the render loop stopped on removal: restart it
+}
+
 function updateCarry(dt) {
   if (carry.removed) return;
   if (carry.removing) { updateRemoval(); frameView(); return; }
@@ -1689,4 +1733,4 @@ setState('idle', { quiet: true });
 requestAnimationFrame(frame);
 
 // small hook for automated checks
-window.orbi = { carry, look, pageNav, get dozed() { return dozed; }, poke, goPage, view, setState, nudge, helmet, toggleVisor, advance: update, faceCanvas, intro, gaze, replay: () => { setState('idle', { quiet: true }); helmet.setVisorDown(false); syncVisor(); Object.assign(intro, { active: true, t: 0, scale: 0, greeted: false, popped: false }); }, get state() { return state; }, motion: m, renderer, scene, camera };
+window.orbi = { restoreBot, carry, look, pageNav, get dozed() { return dozed; }, poke, goPage, view, setState, nudge, helmet, toggleVisor, advance: update, faceCanvas, intro, gaze, replay: () => { setState('idle', { quiet: true }); helmet.setVisorDown(false); syncVisor(); Object.assign(intro, { active: true, t: 0, scale: 0, greeted: false, popped: false }); }, get state() { return state; }, motion: m, renderer, scene, camera };

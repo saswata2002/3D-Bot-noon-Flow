@@ -912,8 +912,18 @@ function syncColour() { if (picker) picker.sync(themeIdx); }
 // Changing colour turns the bot a full 360° (to its left, like the intro) with
 // a little hop; the new colour swaps in while it faces away, so it comes back
 // round already recoloured. Clicking again mid-turn adds another turn.
-const COLOUR_SPIN = { dur: 0.95, swapAt: 0.36 };       // swap once ~130° round (back to camera)
-const colourSpin = { active: false, t: 0, from: 0, to: 0, pending: null };
+// (this page: the turn is one spring, not upstream's 0.95 s ease-out-back — that
+// overshot 16° and swung back, then handed a dead stop to the yaw spring. The
+// spring launches with a kick, is face-on in ≈275 ms with a ≈4° overshoot, and
+// rests at ≈610 ms, its velocity carried straight into the idle settle.)
+const COLOUR_SPIN = { omega: 15, zeta: 0.8, kick: 10, swapAt: 0.36 };   // swap once ~130° round (back to camera)
+const colourSpin = { active: false, t: 0, from: 0, to: 0, s: 0, sv: 0, pending: null };
+// aim the turn at `to`: a fresh turn launches with the kick; another turn added mid-spin keeps its speed
+function launchSpin(to, pending) {
+  const was = colourSpin.active;
+  Object.assign(colourSpin, { active: true, t: 0, from: m.spin, to, s: m.spin - to,
+    sv: was ? colourSpin.sv : Math.min(m.spinV, 0) - COLOUR_SPIN.kick, pending });
+}
 function cycleColour() {
   themeIdx = (themeIdx + 1) % THEMES.length;
   try { localStorage.setItem('orbi.theme', String(themeIdx)); } catch {}
@@ -921,7 +931,7 @@ function cycleColour() {
   if (intro.active) endIntro();
   const TAU = Math.PI * 2;
   const base = colourSpin.active ? colourSpin.to : Math.round(m.spin / TAU) * TAU;
-  Object.assign(colourSpin, { active: true, t: 0, from: m.spin, to: base - TAU, pending: toColors(THEMES[themeIdx]) });
+  launchSpin(base - TAU, toColors(THEMES[themeIdx]));
   m.homing = false;
   hop(1.8);
 }
@@ -936,7 +946,7 @@ function spinToTheme(i) {
   if (colourSpin.active && colourSpin.pending) { colourSpin.pending = next; return; }
   const TAU = Math.PI * 2;
   const base = colourSpin.active ? colourSpin.to : Math.round(m.spin / TAU) * TAU;
-  Object.assign(colourSpin, { active: true, t: 0, from: m.spin, to: base - TAU, pending: next });
+  launchSpin(base - TAU, next);
   m.homing = false;
   hop(1.8);
 }
@@ -949,13 +959,17 @@ function swapColourNow() {
 function updateColourSpin(dt) {
   if (!colourSpin.active) return;
   colourSpin.t += dt;
-  const p = Math.min(1, colourSpin.t / COLOUR_SPIN.dur);
-  const prev = m.spin;
-  const e = easeOutBack(p, 1.1);                      // quick start, a soft overshoot as it comes face-on
-  m.spin = colourSpin.from + (colourSpin.to - colourSpin.from) * e;
-  m.spinV = dt > 0 ? (m.spin - prev) / dt : 0;        // drives the roll lean, like a flick
-  if (e >= COLOUR_SPIN.swapAt) swapColourNow();
-  if (p >= 1) endColourSpin();
+  const w = COLOUR_SPIN.omega, z = COLOUR_SPIN.zeta, cs = colourSpin;
+  for (let left = dt; left > 1e-6; left -= 1 / 240) {
+    const h = Math.min(left, 1 / 240);
+    cs.sv += (-w * w * cs.s - 2 * z * w * cs.sv) * h;
+    cs.s += cs.sv * h;
+  }
+  m.spin = cs.to + cs.s;
+  m.spinV = cs.sv;                                    // the real speed drives the roll lean, like a flick
+  const span = cs.from - cs.to;
+  if (span && 1 - cs.s / span >= COLOUR_SPIN.swapAt) swapColourNow();
+  if (Math.abs(cs.s) < 0.003 && Math.abs(cs.sv) < 0.05) { endColourSpin(); m.spinV = cs.sv; }   // at rest: seamless hand-off
 }
 function endColourSpin() {
   if (!colourSpin.active) return;

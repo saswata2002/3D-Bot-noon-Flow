@@ -962,9 +962,10 @@ function carryTo(px, py, dt) {
       trashEl.classList.toggle('is-armed', armed);
       trashLabel.textContent = armed ? 'Release to remove' : 'Drag here to remove';
       haptic(armed ? 'snap' : 'tick');
-      // on the cross it gets angry (upstream's Angry: brows, frown, flush, shudder); off it, it calms down
-      if (armed) { if (state !== 'angry') setState('angry'); }
-      else if (state === 'angry') setState('idle', { quiet: true });
+      // on the cross: the visor swings up (if down) and then it gets angry (brows, frown, flush, shudder);
+      // off it, the sequence is dropped and it calms down
+      if (armed) { if (state !== 'angry') visorUpThen(() => { if ((carry.armed || carry.removing) && state !== 'angry') setState('angry'); }); }
+      else { visorCue = null; if (state === 'angry') setState('idle', { quiet: true }); }
     }
     if (armed) { gx = THREE.MathUtils.lerp(tx, zx, TRASH.magnet); gy = THREE.MathUtils.lerp(ty, zy, TRASH.magnet); }
   }
@@ -995,10 +996,11 @@ const trashEl = document.getElementById('orbiTrash');
 const trashLabel = document.getElementById('orbiTrashLabel');
 const TRASH = {
   enter: 64, leave: 84, magnet: 0.72,
-  pop: -170,                          // px/s: the little hop up as it lets go…
-  gravity: 2200,                      // px/s²: …then it falls through the bottom of the frame
-  tumble: 2.4,                        // rad/s of roll — it tumbles as it falls (plus a fast spin)
-  spin: 18,                           // rad/s of turn
+  beat: 220,                          // ms it stays on the cross, angry, after you let go (so the glare reads)
+  windMs: 200, windPx: 16,            // a gentle rise that eases to a stop — the wind-up…
+  gravity: 1500,                      // px/s²: …then it falls from rest through the bottom of the frame (≈0.75 s in all)
+  tumble: 1.8,                        // roll grows as tumble·τ² (rad) — it tips over more and more as it drops
+  spin: [4, 12],                      // rad/s of turn: from 4, rising by 12 per second of fall
 };
 const trashAt = { x: 187.5, y: 693 };
 function showTrash(on) {
@@ -1018,21 +1020,37 @@ function showTrash(on) {
 const trashRing = trashEl && trashEl.querySelector('.orbi-trash__ring');
 function removeBot() {
   carry.active = false; carry.armed = false;
-  carry.removing = { t0: performance.now(), x0: carry.x, y0: carry.y, last: performance.now() };
-  haptic('edge');
-  trashEl.classList.add('is-falling');                       // the label + scrim fade; the ring is driven below
+  // first it waits on the cross — visor up, angry face in, a beat — then it falls (see updateRemoval)
+  carry.removing = { phase: 'wait', t0: performance.now(), last: performance.now() };
+  if (state !== 'angry' && !visorCue) visorUpThen(() => setState('angry'));   // released before it got there
 }
+const easeOutCubicR = (x) => 1 - (1 - x) ** 3;
 function updateRemoval() {
   const r = carry.removing, now = performance.now();
-  const t = (now - r.t0) / 1000, dt = Math.min(0.05, (now - r.last) / 1000);
+  const dt = Math.min(0.05, (now - r.last) / 1000);
   r.last = now;
-  carry.y = r.y0 + TRASH.pop * t + 0.5 * TRASH.gravity * t * t;   // pop, then falls out of the frame
-  carry.tumble += TRASH.tumble * dt * (1 + 2 * t);           // tumbling faster as it drops
-  m.spin += TRASH.spin * dt;
+  if (r.phase === 'wait') {
+    // settles onto the cross while the visor goes up and the angry face comes in
+    const zx = trashAt.x - view.cx, zy = trashAt.y - view.cy, k = 1 - Math.exp(-dt * 10);
+    carry.x += (zx - carry.x) * k; carry.y += (zy - carry.y) * k;
+    const ready = state === 'angry' && !morph && !visorCue && now - r.t0 >= TRASH.beat;
+    if (!ready && now - r.t0 < 1800) return;
+    r.phase = 'fall'; r.tf = now; r.y0 = carry.y;
+    haptic('edge');                                          // the firm click as it lets go of the cross
+    trashEl.classList.add('is-falling');                     // the label + scrim fade; the ring is driven below
+    return;
+  }
+  // a gentle wind-up that eases to a stop, then a fall from rest — velocity is continuous throughout
+  const tau = (now - r.tf) / 1000, w = TRASH.windMs / 1000;
+  const lift = TRASH.windPx * easeOutCubicR(Math.min(1, tau / w));
+  const tf = Math.max(0, tau - w);
+  carry.y = r.y0 - lift + 0.5 * TRASH.gravity * tf * tf;
+  carry.tumble = TRASH.tumble * tf * tf;                     // tips over more and more as it drops
+  m.spin += (TRASH.spin[0] + TRASH.spin[1] * tf) * dt;
   // the cross circle falls with it — the same drop, frame for frame — so they leave the frame together
   if (trashRing) trashRing.style.transform = `translateY(${(carry.y - r.y0).toFixed(2)}px) scale(1.25) rotate(${(carry.tumble * 40).toFixed(1)}deg)`;
   const H = screenEl.clientHeight || 812, gone = view.cy + carry.y - view.unit * 2.2 > H;   // fully below the bottom edge
-  if (!gone && t < 1.5) return;
+  if (!gone && tau < 2) return;
   carry.removing = null; carry.removed = true;
   canvas.classList.add('is-removed'); hit.classList.add('is-removed');
   canvas.setAttribute('aria-hidden', 'true'); hit.setAttribute('aria-hidden', 'true');
@@ -1562,7 +1580,7 @@ function update(dt) {
   while (acc >= H) { stepMotion(H); acc -= H; }
   // a tick per 30° detent the user's turn passes (not the entry's 360°)
   const det = Math.round(m.spin / DETENT);
-  if (det !== spinDetent) { if (!intro.active && !pageNav.show && !carry.removing) haptic('tick'); spinDetent = det; }   // (scripted spins don't tick)
+  if (det !== spinDetent) { if (!intro.active && !pageNav.show && !carry.removing && !carry.removed) haptic('tick'); spinDetent = det; }   // (scripted spins don't tick)
 
   // state-specific pose (self-driven — never from the cursor)
   updateLook(dt);

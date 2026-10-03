@@ -721,6 +721,6 @@ img.contain { object-fit: contain; }
 }
 /* released on the cross: the ring falls with the bot (JS drives its transform), the label and scrim fade */
 .orbi-trash.is-falling .orbi-trash__ring { transition: background-color .18s ease, box-shadow .18s ease; }
-.orbi-trash.is-falling .orbi-trash__label, .orbi-trash.is-falling .orbi-trash__scrim { opacity: 0; transition: opacity .32s ease; }
+.orbi-trash.is-falling .orbi-trash__label, .orbi-trash.is-falling .orbi-trash__scrim { opacity: 0; transition: opacity .6s ease .1s; }
 /* the bot is gone: its canvas and touch target leave the flow */
 .orbi.is-removed, .orbi-hit.is-removed { display: none; }

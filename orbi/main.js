@@ -10,8 +10,8 @@
 // The face is not geometry: each state is drawn into a canvas in Figma
 // coordinates and sampled in the shader by the vertex's rest direction.
 //
-// Brought over 1:1 from github.com/saswata2002/3D-noon-bot (d4993be — Angry
-// state; first ported at f0a4ade). The only changes:
+// Brought over 1:1 from github.com/saswata2002/3D-noon-bot (6f0850f — brand
+// colours, lacquer finish, shorter eyes; first ported at f0a4ade). The only changes:
 // the state bar and its visor button are gone (keys 1–6 switch states, V or a
 // vertical swipe flips the visor),
 // the white scene background is dropped (transparent over Home), the canvas is
@@ -212,7 +212,7 @@ const arcPts = (cx, cy, r, a0, a1) => Array.from({ length: NP }, (_, i) => {
 });
 // left eye per face (Figma px, eye centre around x −32)
 const LEFT_EYE = {
-  pill:     () => { const l = linePts(-32, -24, -32, 10); return { a: l, b: l, w: 28 }; },          // 28 × 62 pill
+  pill:     () => { const l = linePts(-32, -20, -32, 6); return { a: l, b: l, w: 28 }; },           // 28 × 54 pill (Figma 62, shortened)
   greeting: () => { const l = arcPts(-32, -7, 12.5, Math.PI + 0.38, Math.PI * 2 - 0.38); return { a: l, b: l, w: 6.5 }; },
   error:    () => { const l = linePts(-45, -6, -19, -6); return { a: l, b: l, w: 9 }; },
   dizzy:    () => ({ a: linePts(-44, -16, -22, 6), b: linePts(-22, -16, -44, 6), w: 7.5 }),
@@ -358,7 +358,7 @@ function drawFace(spec, open = 1) {
     const [ec, ex] = scratchFor('eye', FACE_PX, FACE_PX);
     ex.setTransform(fctx.getTransform());
     // blink: squash the eye vertically about its centre (pill eyes only)
-    const sq = lerp(1, Math.max(open, 5 / 62), spec.blink);
+    const sq = lerp(1, Math.max(open, 5 / 54), spec.blink);   // (upstream 6f0850f: the pill is 54 tall now)
     ex.translate(0, Y(cy)); ex.scale(1, sq); ex.translate(0, -Y(cy));
     const g = ex.createLinearGradient(0, Y(y0 - e.w / 2), 0, Y(y1 + e.w / 2));
     g.addColorStop(0, top);
@@ -390,7 +390,7 @@ function drawFace(spec, open = 1) {
     // glint
     const ga = 0.85 * k * THREE.MathUtils.clamp((open - 0.45) * 3, 0, 1);
     if (ga > 0.01) {
-      const hh = h * Math.max(open, 5 / 62);
+      const hh = h * Math.max(open, 5 / 54);
       fctx.save();
       fctx.globalAlpha = ga;
       const gx = X(cx - e.w * 0.22 - 3), gy = Y(cy - hh * 0.36), gp = 0.6 * S * 3;
@@ -407,9 +407,9 @@ function drawFace(spec, open = 1) {
 // ─── body material ────────────────────────────────────────────────────────
 const bodyMat = new THREE.MeshPhysicalMaterial({
   color: 0xffeb45,
-  roughness: 0.58,
-  clearcoat: 0.18,
-  clearcoatRoughness: 0.42,
+  roughness: 0.5,
+  clearcoat: 0.6,                // lacquered candy finish: a crisp softbox highlight over the satin base
+  clearcoatRoughness: 0.26,     // soft enough that the key light blooms instead of a pin-point hotspot
   specularIntensity: 0.75,
   sheen: 0.3,
   sheenColor: new THREE.Color(0xfff6c8),
@@ -420,7 +420,10 @@ const uniforms = {
   faceMap: { value: faceTex },
   uTint: { value: new THREE.Color(0xf2dc00) },
   uRimColor: { value: new THREE.Color(0xfffbe0) },
-  uRim: { value: 0.18 },
+  uRim: { value: 0.3 },
+  uGlowColor: { value: new THREE.Color(0xffeb45) },     // inner glow, in the body colour (themed)
+  uGlow: { value: 0.16 },
+  uShade: { value: new THREE.Color(0.9, 0.86, 0.74) },   // colour of the helmet shade (themed)
 };
 // Helmet → ball occlusion, evaluated on the ball's rest sphere (the helmet is
 // a child of the body, so they share that space). The face window is the
@@ -430,7 +433,7 @@ const uniforms = {
 //   • inside the window: dark at the liner, opening to full light ~0.34 in
 //   • under the shell: deep shade (the inside of the helmet)
 //   • below the shell rim (y −0.55): back into the light over ~0.35
-// The shadow is a touch warm so it reads as yellow in shade, not grey.
+// The shadow is tinted by the theme (uShade) so it reads as the body colour in shade, not grey.
 const HELMET_AO_GLSL = `
 {
   vec3 rp = normalize(vRest);
@@ -440,7 +443,7 @@ const HELMET_AO_GLSL = `
   float faceAO = mix(0.46, 1.0, smoothstep(0.0, 0.34, -sd));
   float ao = (rp.z > 0.0 && sd < 0.0) ? faceAO : 0.42;
   ao = max(ao, mix(0.42, 1.0, smoothstep(-0.5, -0.88, rp.y)));   // below the rim
-  outgoingLight *= ao * mix(vec3(0.9, 0.86, 0.74), vec3(1.0), ao);
+  outgoingLight *= ao * mix(uShade, vec3(1.0), ao);
 }`;
 
 bodyMat.onBeforeCompile = (sh) => {
@@ -454,6 +457,9 @@ uniform sampler2D faceMap;
 uniform vec3 uTint;
 uniform vec3 uRimColor;
 uniform float uRim;
+uniform vec3 uShade;
+uniform vec3 uGlowColor;
+uniform float uGlow;
 varying vec3 vRest;
 ${SURFACE_GLSL}`)
     .replace('#include <color_fragment>', `#include <color_fragment>
@@ -485,6 +491,9 @@ material.clearcoat *= 1.0 - 0.5 * faceA;
 material.specularColor *= 1.0 - 0.6 * faceA;
 material.specularColorBlended *= 1.0 - 0.6 * faceA;`)
     .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+// premium inner glow: the colour seems lit from within, strongest where the ball faces the camera
+float facing = saturate(dot(normal, normalize(vViewPosition)));
+totalEmissiveRadiance += uGlowColor * uGlow * facing * facing;
 totalEmissiveRadiance *= 1.0 - faceA;`)
     .replace('#include <opaque_fragment>', `float fres = pow(1.0 - saturate(dot(normal, normalize(vViewPosition))), 3.0);
 outgoingLight += uRimColor * fres * uRim * (1.0 - faceA);
@@ -658,7 +667,7 @@ function nudge(dir) {
 
 function stepMotion(h) {
   // yaw: the pointer drives it while held; after release it returns face-on
-  if (!m.dragging && !intro.active && !pageNav.show) {   // (the sheet show drives the spin itself)
+  if (!m.dragging && !intro.active && !pageNav.show && !colourSpin.active) {   // (scripted spins drive the turn themselves)
     // after a release (see planReturn): coast on the flick's momentum with a
     // friction tuned to come to rest on the chosen front-facing turn, then a
     // soft spring finishes the settle (or brings a slow release straight back)
@@ -835,6 +844,111 @@ function toggleVisor() {
   endIntro();
   setVisor(!helmet.visorDown);
 }
+// ─── colour themes ────────────────────────────────────────────────────────
+// C cycles the bot's colour: the ball (base + lower tint) and the
+// helmet's paint + stitching (accent) change together and glide over ~0.5 s.
+// The last choice is remembered per browser (a convenience only).
+const THEMES = [
+  // brand tiles from Figma "colour options" (1107:115295); accent = the tile colour
+  { name: 'noon',      body: 0xffeb45, tint: 0xf2dc00, accent: 0xfeee00, sheen: 0xfff6c8, shade: [0.9, 0.86, 0.74] },
+  { name: 'supermall', body: 0x2526cc, tint: 0x1d1ea0, accent: 0x2122b8 },
+  { name: 'Minutes',   body: 0xd12b28, tint: 0xa3221f, accent: 0xd12b28 },
+  { name: 'Jahez',     body: 0xf8113a, tint: 0xc90628, accent: 0xf8113a },
+  { name: 'noon Food', body: 0xe01858, tint: 0xaf1345, accent: 0xe01858 },
+  { name: 'NowNow',    body: 0xf33a01, tint: 0xbe2d01, accent: 0xf33a01 },
+];
+// Sheen, rim light and helmet-shade colour follow the body; noon keeps its
+// hand-tuned originals, the rest derive them the same way.
+const WHITE = new THREE.Color(1, 1, 1);
+// The brand tiles are flat-graphic saturated; on the 3D ball they read too loud,
+// so every theme except noon is toned down (HSL saturation × BRAND_SAT).
+const BRAND_SAT = 0.8;
+function themeColor(th, hex) {
+  const c = new THREE.Color(hex);
+  if (th.name === 'noon') return c;
+  const hsl = c.getHSL({}, THREE.SRGBColorSpace);
+  return c.setHSL(hsl.h, hsl.s * BRAND_SAT, hsl.l, THREE.SRGBColorSpace);
+}
+function toColors(th) {
+  const body = themeColor(th, th.body), tint = themeColor(th, th.tint);
+  const t = [(th.tint >> 16 & 255) / 255, (th.tint >> 8 & 255) / 255, (th.tint & 255) / 255];
+  const mx = Math.max(...t);
+  return {
+    body, tint, accent: themeColor(th, th.accent),
+    sheen: th.sheen != null ? new THREE.Color(th.sheen) : WHITE.clone().lerp(body, 0.3),
+    rim: WHITE.clone().lerp(body, 0.55),               // brand-tinted edge glow
+    shade: th.shade ? new THREE.Color(...th.shade) : new THREE.Color(...t.map((c) => 0.9 - 0.16 * (1 - c / mx))),
+    logo: th.name === 'noon' ? 0 : 1,                 // front wordmark: black on noon yellow, white on the rest
+  };
+}
+let themeIdx = 0;
+try { themeIdx = Math.min(THEMES.length - 1, Math.max(0, +localStorage.getItem('orbi.theme') || 0)); } catch {}
+const themeCur = toColors(THEMES[themeIdx]);
+let themeTarget = toColors(THEMES[themeIdx]);
+function applyTheme() {
+  bodyMat.color.copy(themeCur.body);
+  uniforms.uTint.value.copy(themeCur.tint);
+  uniforms.uRimColor.value.copy(themeCur.rim);
+  uniforms.uShade.value.copy(themeCur.shade);
+  uniforms.uGlowColor.value.copy(themeCur.body);
+  bodyMat.sheenColor.copy(themeCur.sheen);
+  bodyMat.emissive.copy(themeCur.tint).multiplyScalar(0.008);   // ≈ the original 0x141000 for yellow
+  helmet.setAccent(themeCur.accent);
+  helmet.setLogoWhite(themeCur.logo);
+}
+let themeRate = 7;                                    // blend speed (1/s); quicker while it swaps mid-spin
+function updateTheme(dt) {
+  const k = 1 - Math.exp(-dt * themeRate);
+  for (const key of ['body', 'tint', 'accent', 'sheen', 'rim', 'shade']) themeCur[key].lerp(themeTarget[key], k);
+  themeCur.logo += (themeTarget.logo - themeCur.logo) * k;
+  applyTheme();
+}
+// (upstream's swatch button lives in its state bar, which isn't brought over —
+// here the colour cycles with the C key)
+function syncColour() {}
+// Changing colour turns the bot a full 360° (to its left, like the intro) with
+// a little hop; the new colour swaps in while it faces away, so it comes back
+// round already recoloured. Clicking again mid-turn adds another turn.
+const COLOUR_SPIN = { dur: 0.95, swapAt: 0.36 };       // swap once ~130° round (back to camera)
+const colourSpin = { active: false, t: 0, from: 0, to: 0, pending: null };
+function cycleColour() {
+  themeIdx = (themeIdx + 1) % THEMES.length;
+  try { localStorage.setItem('orbi.theme', String(themeIdx)); } catch {}
+  syncColour();
+  if (intro.active) endIntro();
+  const TAU = Math.PI * 2;
+  const base = colourSpin.active ? colourSpin.to : Math.round(m.spin / TAU) * TAU;
+  Object.assign(colourSpin, { active: true, t: 0, from: m.spin, to: base - TAU, pending: toColors(THEMES[themeIdx]) });
+  m.homing = false;
+  hop(1.8);
+}
+function swapColourNow() {
+  if (!colourSpin.pending) return;
+  themeTarget = colourSpin.pending;
+  colourSpin.pending = null;
+  themeRate = 30;                                     // near-instant while its back is turned (no muddy mid-blend)
+}
+function updateColourSpin(dt) {
+  if (!colourSpin.active) return;
+  colourSpin.t += dt;
+  const p = Math.min(1, colourSpin.t / COLOUR_SPIN.dur);
+  const prev = m.spin;
+  const e = easeOutBack(p, 1.1);                      // quick start, a soft overshoot as it comes face-on
+  m.spin = colourSpin.from + (colourSpin.to - colourSpin.from) * e;
+  m.spinV = dt > 0 ? (m.spin - prev) / dt : 0;        // drives the roll lean, like a flick
+  if (e >= COLOUR_SPIN.swapAt) swapColourNow();
+  if (p >= 1) endColourSpin();
+}
+function endColourSpin() {
+  if (!colourSpin.active) return;
+  swapColourNow();
+  colourSpin.active = false;
+  themeRate = 7;
+  m.spinV = 0;
+  m.homing = true; m.home = colourSpin.to; m.glideF = 0;   // the yaw spring finishes the settle
+}
+syncColour();
+applyTheme();
 addEventListener('keydown', (e) => {
   const n = parseInt(e.key, 10);
   if (n >= 1 && n <= STATES.length) {
@@ -846,6 +960,7 @@ addEventListener('keydown', (e) => {
     if (key === 'greeting' || key === 'sleepy') visorUpThen(go); else { visorCue = null; go(); }
   }
   if (e.key === 'v' || e.key === 'V') { toggleVisor(); haptic('tap'); }
+  if (e.key === 'c' || e.key === 'C') cycleColour();
   if (e.key === 'ArrowLeft') nudge(-1);
   if (e.key === 'ArrowRight') nudge(1);
 });
@@ -888,6 +1003,7 @@ hit.addEventListener('pointerdown', (e) => {
   gesture = { x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, lt: performance.now(), t: performance.now(), moved: 0, axis: null, fired: false };
   haptic('tap');
   if (intro.active) { const sp = m.spin; endIntro(); m.spin = sp; }   // grab takes over mid-turn
+  if (colourSpin.active) { const sp = m.spin; endColourSpin(); m.spin = sp; }
   m.dragging = true;
   m.homing = false;
   m.spinV = 0;
@@ -1185,7 +1301,7 @@ const easeInQuad = (x) => x * x;
 const easeOutCubicF = (x) => 1 - (1 - x) ** 3;
 // The "closed eye": a short horizontal stroke, exactly the size of a pill eye
 // squashed shut (28 wide × ~7 tall), so the two can hand over seamlessly.
-const SQUASH = 7.1 / 62;
+const SQUASH = 7.1 / 54;
 const CLOSED = (() => {
   const l = linePts(-42.5, -7, -21.5, -7);
   return { eyes: [{ a: l, b: l, w: 7 }, { a: mirror(l), b: mirror(l), w: 7 }], mouth: MOUTH.none(), glint: 0, lip: 1, cheeks: 0, blink: 0 };
@@ -1653,16 +1769,18 @@ function update(dt) {
   else m.hoverY = HOVER_Y + Math.sin(t * 1.6) * (state === 'working' ? 0.02 : 0.05);
 
   updateIntro(dt);
+  updateColourSpin(dt);
   acc += dt;
   while (acc >= H) { stepMotion(H); acc -= H; }
   // a tick per 30° detent the user's turn passes (not the entry's 360°)
   const det = Math.round(m.spin / DETENT);
-  if (det !== spinDetent) { if (!intro.active && !pageNav.show && !carry.removing && !carry.removed) haptic('tick'); spinDetent = det; }   // (scripted spins don't tick)
+  if (det !== spinDetent) { if (!intro.active && !pageNav.show && !carry.removing && !carry.removed && !colourSpin.active) haptic('tick'); spinDetent = det; }   // (scripted spins don't tick)
 
   // state-specific pose (self-driven — never from the cursor)
   updateLook(dt);
   updateGaze(dt);
   helmet.update(dt);
+  updateTheme(dt);
   // state pose, crossfaded from the previous state's pose after a change
   poseBlend = Math.min(1, poseBlend + dt / POSE_BLEND_S);
   prevStateTime += dt;
@@ -1739,4 +1857,4 @@ setState('idle', { quiet: true });
 requestAnimationFrame(frame);
 
 // small hook for automated checks
-window.orbi = { restoreBot, carry, look, pageNav, get dozed() { return dozed; }, poke, goPage, view, setState, nudge, helmet, toggleVisor, advance: update, faceCanvas, intro, gaze, replay: () => { setState('idle', { quiet: true }); helmet.setVisorDown(false); syncVisor(); Object.assign(intro, { active: true, t: 0, scale: 0, greeted: false, popped: false }); }, get state() { return state; }, motion: m, renderer, scene, camera };
+window.orbi = { restoreBot, carry, look, pageNav, get dozed() { return dozed; }, poke, goPage, view, setState, nudge, cycleColour, get theme() { return THEMES[themeIdx].name; }, helmet, toggleVisor, advance: update, faceCanvas, intro, gaze, replay: () => { setState('idle', { quiet: true }); helmet.setVisorDown(false); syncVisor(); Object.assign(intro, { active: true, t: 0, scale: 0, greeted: false, popped: false }); }, get state() { return state; }, motion: m, bodyUniforms: uniforms, bodyMat, renderer, scene, camera };

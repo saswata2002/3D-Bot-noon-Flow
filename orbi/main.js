@@ -10,8 +10,8 @@
 // The face is not geometry: each state is drawn into a canvas in Figma
 // coordinates and sampled in the shader by the vertex's rest direction.
 //
-// Brought over 1:1 from github.com/saswata2002/3D-noon-bot (1dfc668 — crown
-// plate, swipe up/down for the visor; first ported at f0a4ade). The only changes:
+// Brought over 1:1 from github.com/saswata2002/3D-noon-bot (d4993be — Angry
+// state; first ported at f0a4ade). The only changes:
 // the state bar and its visor button are gone (keys 1–6 switch states, V or a
 // vertical swipe flips the visor),
 // the white scene background is dropped (transparent over Home), the canvas is
@@ -51,6 +51,7 @@ const STATES = [
   { key: 'error',    label: 'Error' },
   { key: 'dizzy',    label: 'Dizzy' },
   { key: 'sleepy',   label: 'Sleepy' },
+  { key: 'angry',    label: 'Angry' },
 ];
 
 // ─── renderer / scene ─────────────────────────────────────────────────────
@@ -216,14 +217,18 @@ const LEFT_EYE = {
   error:    () => { const l = linePts(-45, -6, -19, -6); return { a: l, b: l, w: 9 }; },
   dizzy:    () => ({ a: linePts(-44, -16, -22, 6), b: linePts(-22, -16, -44, 6), w: 7.5 }),
   sleepy:   () => { const l = arcPts(-32, -12, 12, Math.PI - 0.32, 0.32); return { a: l, b: l, w: 6.5 }; },
+  // angry: a stroke is the narrowed eye (short pill), b the brow — high at the
+  // outer side, dropping toward the nose
+  angry:    () => ({ a: linePts(-31, -9, -31, 7), b: linePts(-49, -35, -17, -21), w: 22 }),
 };
-const FACE_OF = { idle: 'pill', working: 'pill', greeting: 'greeting', error: 'error', dizzy: 'dizzy', sleepy: 'sleepy' };
+const FACE_OF = { idle: 'pill', working: 'pill', greeting: 'greeting', error: 'error', dizzy: 'dizzy', sleepy: 'sleepy', angry: 'angry' };
 const mirror = (pts) => pts.map(([x, y]) => [-x, y]);
 // Mouth: only the greeting smiles; every other face keeps it collapsed to a
 // point (width 0) at the same spot, so the smile grows out of / shrinks into
 // nothing as faces morph.
 const MOUTH = {
   smile: () => ({ a: arcPts(0, 13, 10.5, Math.PI - 0.55, 0.55), w: 5.5 }),
+  frown: () => ({ a: arcPts(0, 29, 9.5, Math.PI + 0.6, Math.PI * 2 - 0.6), w: 5.5 }),
   none: () => ({ a: linePts(0, 23, 0, 23), w: 0 }),
 };
 function faceSpec(state) {
@@ -232,7 +237,10 @@ function faceSpec(state) {
   const R = { a: mirror(L.a), b: mirror(L.b), w: L.w };
   const pill = kind === 'pill' ? 1 : 0;
   const happy = kind === 'greeting' ? 1 : 0;
-  return { eyes: [L, R], mouth: (happy ? MOUTH.smile : MOUTH.none)(), glint: pill, lip: pill, cheeks: happy, blink: pill };
+  const angry = kind === 'angry' ? 1 : 0;
+  const mouth = happy ? MOUTH.smile() : angry ? MOUTH.frown() : MOUTH.none();
+  // brow width: the angry brow is a thinner stroke than its eye (stroke b)
+  return { eyes: [L, R], mouth, glint: pill, lip: pill, cheeks: happy, flush: angry, brow: angry, blink: pill };
 }
 const lerp = (a, b, t) => a + (b - a) * t;
 const lerpPts = (A, B, t) => A.map((p, i) => [lerp(p[0], B[i][0], t), lerp(p[1], B[i][1], t)]);
@@ -242,6 +250,7 @@ function lerpFace(A, B, t) {
     mouth: { a: lerpPts(A.mouth.a, B.mouth.a, t), w: lerp(A.mouth.w, B.mouth.w, t) },
     glint: lerp(A.glint, B.glint, t), lip: lerp(A.lip, B.lip, t),
     cheeks: lerp(A.cheeks, B.cheeks, t), blink: lerp(A.blink, B.blink, t),
+    flush: lerp(A.flush || 0, B.flush || 0, t), brow: lerp(A.brow || 0, B.brow || 0, t),
   };
 }
 
@@ -295,10 +304,28 @@ function cheeksImage() {                            // the greeting blush, blurr
   return cheeks;
 }
 
+let flush = null;
+function flushImage() {                             // the angry red flush, blurred once (face px, before FACE_DY)
+  if (flush) return flush;
+  flush = document.createElement('canvas');
+  flush.width = flush.height = FACE_PX;
+  blurFill(flush.getContext('2d'), 10 * S, 'rgba(232,70,40,0.32)', (x) => {
+    x.beginPath(); x.ellipse(X(0), Y(-2), 70 * S, 34 * S, 0, 0, Math.PI * 2); x.fill();
+  });
+  return flush;
+}
+
 function drawFace(spec, open = 1) {
   fctx.clearRect(0, 0, FACE_PX, FACE_PX);
   fctx.save();
   fctx.translate(0, FACE_DY * S);
+
+  if (spec.flush > 0.01) {                           // angry red flush
+    fctx.save();
+    fctx.globalAlpha = spec.flush;
+    fctx.drawImage(flushImage(), 0, 0);               // pre-blurred once (WebKit ignores ctx.filter)
+    fctx.restore();
+  }
 
   if (spec.cheeks > 0.01) {                          // greeting blush
     fctx.save();
@@ -338,14 +365,17 @@ function drawFace(spec, open = 1) {
     g.addColorStop(0.32, '#0c0c0c');
     g.addColorStop(1, '#000');
     ex.strokeStyle = g;
-    ex.lineWidth = e.w * S;
     ex.lineCap = 'round';
     ex.lineJoin = 'round';
-    ex.beginPath();
-    for (const pts of [e.a, e.b]) {
+    // stroke b shares the eye's width, except as a brow (angry), where it thins (upstream d4993be)
+    const widths = [e.w, lerp(e.w, 8.5, spec.brow || 0)];
+    const same = e.a.every((p, i) => Math.abs(p[0] - e.b[i][0]) + Math.abs(p[1] - e.b[i][1]) < 0.01);
+    (same ? [e.a] : [e.a, e.b]).forEach((pts, si) => {     // single-stroke eyes: draw once
+      ex.lineWidth = widths[si] * S;
+      ex.beginPath();
       pts.forEach(([x, y], i) => (i ? ex.lineTo(X(x), Y(y)) : ex.moveTo(X(x), Y(y))));
-    }
-    ex.stroke();
+      ex.stroke();
+    });
     // composited in place, its bottom lip (the 2px white drop shadow on the Figma eyes) as the image's shadow
     const m = (e.w / 2 + 4) * S;                     // eye box in device px (+ room for the lip)
     const bx = Math.max(0, X(x0) - m), by = Math.max(0, Y(y0) + FACE_DY * S - m);
@@ -754,6 +784,22 @@ function setState(next, { quiet = false } = {}) {
       case 'dizzy':
         m.vx += 1.6;
         break;
+      case 'angry': {
+        // stiffen with a shudder, then a faint steady tremble with a little
+        // huff (hop + shake burst) every couple of seconds
+        m.shake = 0.024;
+        m.nodV += 1.4;
+        schedule(0.4, () => { m.shake = 0.006; });
+        const huff = () => {
+          if (state !== 'angry') return;
+          hop(1.7);
+          m.shake = 0.02;
+          schedule(0.32, () => { if (state === 'angry') m.shake = 0.006; });
+          schedule(2.2 + Math.random() * 0.8, huff);
+        };
+        schedule(1.6, huff);
+        break;
+      }
       default:
         if (prev === 'sleepy') hop(3.6);
     }
@@ -781,7 +827,7 @@ addEventListener('keydown', (e) => {
   if (n >= 1 && n <= STATES.length) {
     endIntro();
     const key = STATES[n - 1].key;
-    const go = () => { setState(key); haptic(key === 'greeting' ? 'success' : key === 'error' ? 'edge' : 'tap'); };
+    const go = () => { setState(key); haptic(key === 'greeting' ? 'success' : key === 'error' || key === 'angry' ? 'edge' : 'tap'); };
     if (key === 'sleepy' && (pageNav.open || pageNav.show)) return;   // no sleeping while the sheet is open
     if (key === 'greeting' || key === 'sleepy') visorUpThen(go); else { visorCue = null; go(); }
   }
@@ -1455,6 +1501,10 @@ function statePose(st, t, st_t) {
     case 'error':
       p.roll = Math.sin(st_t * 18) * 0.1 * Math.exp(-st_t * 3);
       p.pitch = 0.05;
+      break;
+    case 'angry':
+      p.pitch = 0.13;                                  // head down: a glare from under the brows
+      p.roll = Math.sin(t * 1.9) * 0.025;              // slow, stiff sway
       break;
     case 'dizzy':
       p.roll = Math.sin(t * 2.6) * 0.24;

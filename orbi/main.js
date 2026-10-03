@@ -149,7 +149,7 @@ const CARRY = {
   maxFling: 2400,                     // px/s of throw carried into the spring
 };
 const carry = { active: false, back: false, x: 0, y: 0, vx: 0, vy: 0, lift: 0, fx0: 0, fy0: 0, ox0: 0, oy0: 0, far: false,
-  trash: false, armed: false, shrink: 1, removing: null, removed: false };
+  trash: false, armed: false, tumble: 0, removing: null, removed: false };
 function resize() {
   renderer.setSize(CANVAS_BOX.w, CANVAS_BOX.h, false);
   frameView();
@@ -161,7 +161,7 @@ function frameView() {
   camera.aspect = 1;
   camera.updateProjectionMatrix();
   const depth = -camera.position.dot(camera.getWorldDirection(camDir));   // view depth of the ball centre
-  const unit = view.unit * (1 + CARRY.lift * carry.lift) * carry.shrink;   // picked up: a touch bigger (over the remove target: smaller)
+  const unit = view.unit * (1 + CARRY.lift * carry.lift);   // picked up: a touch bigger
   const full = unit * 2 * depth * Math.tan(THREE.MathUtils.degToRad(FOV / 2));
   const o = new THREE.Vector3().project(camera);
   const ox = (o.x + 1) / 2 * full, oy = (1 - o.y) / 2 * full;
@@ -924,13 +924,20 @@ function releaseCarry(still) {
 // ─── drag to remove (Home) ─────────────────────────────────────────────────
 // While the bot is held on Home a remove target rises at the bottom. Within
 // TRASH.enter px of it the target arms (grows and brightens, "Release to remove",
-// a snap) and the bot is pulled onto it and shrinks; past TRASH.leave it
-// disarms (a tick). Let go armed and the bot is sucked in — it spins down to
-// nothing and drops out of the frame (a firm click), the target gulps and
-// slides away, and the bot is gone (rendering stops) until the page reloads.
+// a snap) and the bot is pulled onto it — at full size; past TRASH.leave it
+// disarms (a tick). Let go armed and the bot falls out of the frame at full
+// size (a firm click): a little pop up, then gravity takes it down through the
+// bottom edge, tumbling and spinning as it goes, while the target gulps and
+// slides away. The bot is gone (rendering stops) until the page reloads.
 const trashEl = document.getElementById('orbiTrash');
 const trashLabel = document.getElementById('orbiTrashLabel');
-const TRASH = { enter: 64, leave: 84, magnet: 0.72, shrinkTo: 0.72, outMs: 340 };
+const TRASH = {
+  enter: 64, leave: 84, magnet: 0.72,
+  pop: -170,                          // px/s: the little hop up as it lets go…
+  gravity: 2200,                      // px/s²: …then it falls through the bottom of the frame
+  tumble: 2.4,                        // rad/s of roll — it tumbles as it falls (plus a fast spin)
+  spin: 18,                           // rad/s of turn
+};
 const trashAt = { x: 187.5, y: 742 };
 function showTrash(on) {
   if (!trashEl) return;
@@ -948,17 +955,19 @@ function showTrash(on) {
 }
 function removeBot() {
   carry.active = false; carry.armed = false;
-  carry.removing = { t0: performance.now(), x0: carry.x, y0: carry.y, s0: carry.shrink };
+  carry.removing = { t0: performance.now(), x0: carry.x, y0: carry.y, last: performance.now() };
   haptic('edge');
   trashEl.classList.add('is-gulp');
 }
 function updateRemoval() {
-  const r = carry.removing, t = Math.min(1, (performance.now() - r.t0) / TRASH.outMs);
-  const e = t * t * t;                                       // ease-in: it gets sucked in, faster and faster
-  carry.shrink = r.s0 * (1 - e);
-  carry.y = r.y0 + 34 * e;                                   // down into the target, out of the frame
-  m.spin += 0.5;                                             // a quick spin as it goes
-  if (t < 1) return;
+  const r = carry.removing, now = performance.now();
+  const t = (now - r.t0) / 1000, dt = Math.min(0.05, (now - r.last) / 1000);
+  r.last = now;
+  carry.y = r.y0 + TRASH.pop * t + 0.5 * TRASH.gravity * t * t;   // pop, then falls out of the frame
+  carry.tumble += TRASH.tumble * dt * (1 + 2 * t);           // tumbling faster as it drops
+  m.spin += TRASH.spin * dt;
+  const H = screenEl.clientHeight || 812, gone = view.cy + carry.y - view.unit * 2.2 > H;   // fully below the bottom edge
+  if (!gone && t < 1.5) return;
   carry.removing = null; carry.removed = true;
   canvas.classList.add('is-removed'); hit.classList.add('is-removed');
   canvas.setAttribute('aria-hidden', 'true'); hit.setAttribute('aria-hidden', 'true');
@@ -969,7 +978,6 @@ function updateRemoval() {
 function updateCarry(dt) {
   if (carry.removed) return;
   if (carry.removing) { updateRemoval(); frameView(); return; }
-  carry.shrink += ((carry.armed ? TRASH.shrinkTo : 1) - carry.shrink) * (1 - Math.exp(-dt * 14));
   const g = gesture;
   if (g && !g.carried && !g.axis && g.moved < AXIS_LOCK_PX && performance.now() - g.t >= CARRY.holdMs
       && !pageNav.show && !pageNav.anim && !pageNav.drag) startCarry(g);
@@ -1500,7 +1508,7 @@ function update(dt) {
   // carried / swinging home: it leans into sideways moves and tips with vertical ones
   const carryRoll = THREE.MathUtils.clamp(-carry.vx * 0.00045, -0.32, 0.32), carryPitch = THREE.MathUtils.clamp(carry.vy * 0.00035, -0.26, 0.26);
   let pitch = BASE_PITCH + gaze.pitch + look.pitch + pageNav.pose.pitch + carryPitch + lerp(pv.pitch, cur.pitch, pb);
-  let roll = pageNav.pose.roll + carryRoll + lerp(pv.roll, cur.roll, pb);
+  let roll = pageNav.pose.roll + carryRoll + carry.tumble + lerp(pv.roll, cur.roll, pb);
   const sway = lerp(pv.sway, cur.sway, pb);
   // lean into the spin like a ball rolling off a flick, plus landing wobble
   roll += THREE.MathUtils.clamp(-(m.dragging ? m.dragVel : m.spinV) * 0.012, -0.18, 0.18) - m.rock;

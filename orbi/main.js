@@ -1637,6 +1637,44 @@ picker = mountColourPicker({
   haptic,
 });
 
+// ─── device tilt: the phone's left/right tilt turns the bot a little ──────
+// Tilt the phone right → it turns (and leans a touch) right; left → left; back
+// level → back to neutral. Deliberately light: a 2° dead zone (a hand is never
+// perfectly level), then a soft limit — 25° of tilt ≈ 9° of turn, never more
+// than ≈11° — a low-pass that takes out sensor jitter, and a critically damped
+// spring, so it follows promptly and settles without overshoot. Added on top
+// of everything else (it never fights a drag or a scripted spin). iOS only
+// sends motion after the page asks, so the first tap anywhere asks.
+const TILT = { dead: 2, range: 25, yaw: 0.2, roll: 0.05, smooth: 14, k: 90 };
+const tilt = { raw: 0, f: 0, x: 0, v: 0 };
+function onOrientation(e) {
+  if (e.gamma == null) return;
+  const a = (screen.orientation && screen.orientation.angle) || 0;
+  // left/right in the screen's own frame (turned sideways, it's the other axis)
+  tilt.raw = a === 90 ? -e.beta : a === 270 ? e.beta : a === 180 ? -e.gamma : e.gamma;
+}
+if (typeof DeviceOrientationEvent !== 'undefined') {
+  const listen = () => addEventListener('deviceorientation', onOrientation);
+  if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+    const ask = () => {
+      removeEventListener('touchend', ask, true); removeEventListener('click', ask, true);
+      DeviceOrientationEvent.requestPermission().then((r) => { if (r === 'granted') listen(); }).catch(() => {});
+    };
+    addEventListener('touchend', ask, { capture: true, passive: true });
+    addEventListener('click', ask, true);
+  } else listen();
+}
+function updateTilt(dt) {
+  dt = Math.min(dt, 0.05);
+  const g = tilt.raw, mag = Math.max(0, Math.abs(g) - TILT.dead);
+  const x = Math.sign(g) * Math.tanh(mag / TILT.range);          // −1 … 1, easing into the limit
+  tilt.f += (x - tilt.f) * (1 - Math.exp(-dt * TILT.smooth));     // jitter out
+  const target = carry.removing || carry.removed ? 0 : tilt.f;
+  const K = TILT.k, D = 2 * Math.sqrt(K);
+  tilt.v += (K * (target - tilt.x) - D * tilt.v) * dt;
+  tilt.x += tilt.v * dt;
+}
+
 // ─── frame loop ───────────────────────────────────────────────────────────
 const clock = new THREE.Clock();
 const euler = new THREE.Euler(0, 0, 0, 'YXZ');
@@ -1829,6 +1867,7 @@ function update(dt) {
   // state-specific pose (self-driven — never from the cursor)
   updateLook(dt);
   updateGaze(dt);
+  updateTilt(dt);
   helmet.update(dt);
   updateTheme(dt);
   // state pose, crossfaded from the previous state's pose after a change
@@ -1837,11 +1876,11 @@ function update(dt) {
   const cur = statePose(state, t, stateTime);
   const pb = easeInOutCubic(poseBlend);
   const pv = pb < 1 ? statePose(prevState, t, prevStateTime) : cur;
-  let yaw = gaze.yaw + look.yaw + lerp(pv.yaw, cur.yaw, pb);
+  let yaw = gaze.yaw + look.yaw + tilt.x * TILT.yaw + lerp(pv.yaw, cur.yaw, pb);
   // carried / swinging home: it leans into sideways moves and tips with vertical ones
   const carryRoll = THREE.MathUtils.clamp(-carry.vx * 0.00045, -0.32, 0.32), carryPitch = THREE.MathUtils.clamp(carry.vy * 0.00035, -0.26, 0.26);
   let pitch = BASE_PITCH + gaze.pitch + look.pitch + pageNav.pose.pitch + carryPitch + lerp(pv.pitch, cur.pitch, pb);
-  let roll = pageNav.pose.roll + carryRoll + carry.tumble + lerp(pv.roll, cur.roll, pb);
+  let roll = pageNav.pose.roll + carryRoll + carry.tumble - tilt.x * TILT.roll + lerp(pv.roll, cur.roll, pb);
   const sway = lerp(pv.sway, cur.sway, pb);
   // lean into the spin like a ball rolling off a flick, plus landing wobble
   roll += THREE.MathUtils.clamp(-(m.dragging ? m.dragVel : m.spinV) * 0.012, -0.18, 0.18) - m.rock;
@@ -1907,4 +1946,4 @@ setState('idle', { quiet: true });
 requestAnimationFrame(frame);
 
 // small hook for automated checks
-window.orbi = { restoreBot, carry, look, pageNav, get dozed() { return dozed; }, poke, goPage, view, setState, nudge, cycleColour, get theme() { return THEMES[themeIdx].name; }, helmet, toggleVisor, advance: update, faceCanvas, intro, gaze, replay: () => { setState('idle', { quiet: true }); helmet.setVisorDown(false); syncVisor(); Object.assign(intro, { active: true, t: 0, scale: 0, greeted: false, popped: false }); }, get state() { return state; }, motion: m, bodyUniforms: uniforms, bodyMat, renderer, scene, camera };
+window.orbi = { tilt, restoreBot, carry, look, pageNav, get dozed() { return dozed; }, poke, goPage, view, setState, nudge, cycleColour, get theme() { return THEMES[themeIdx].name; }, helmet, toggleVisor, advance: update, faceCanvas, intro, gaze, replay: () => { setState('idle', { quiet: true }); helmet.setVisorDown(false); syncVisor(); Object.assign(intro, { active: true, t: 0, scale: 0, greeted: false, popped: false }); }, get state() { return state; }, motion: m, bodyUniforms: uniforms, bodyMat, renderer, scene, camera };

@@ -786,6 +786,7 @@ export function createHelmet() {
     group,
     visorPickables: visor.pickables,
     get visorDown() { return v.target === 0; },
+    get visorMoving() { return Math.abs(v.va) > 0.02 || Math.abs(v.target - v.a) > 0.002; },   // (this page: render cadence)
     setVisorDown(down, { slow = false } = {}) { v.target = down ? 0 : VISOR_UP; v.spring = slow ? SLOW : SNAPPY; },
     toggleVisor() { v.target = v.target === 0 ? VISOR_UP : 0; v.spring = SNAPPY; return v.target === 0; },
     setAccent(color) { applyAccent(color); },

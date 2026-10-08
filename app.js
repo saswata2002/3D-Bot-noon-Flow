@@ -152,6 +152,7 @@ document.getElementById('screen')?.addEventListener('contextmenu', (e) => e.prev
     hdr.style.setProperty('--big', big.toFixed(3));
     hdr.style.setProperty('--mini', mini.toFixed(3));
     if (pageEl) pageEl.style.transform = `translate3d(0, ${(DH * (1 - p)).toFixed(2)}px, 0)`;
+    hdr.classList.toggle('is-mini', big <= 0.001);   // big logos fully faded: hidden, so the animated Minutes GIF stops repainting
   };
   function setCollapsed(on) {
     if (on === collapsed) return;

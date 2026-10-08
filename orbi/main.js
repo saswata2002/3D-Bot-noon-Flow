@@ -1469,6 +1469,7 @@ function setSheetLive(on) {                                  // layering + a11y 
   if (on) sheetEl.removeAttribute('inert'); else sheetEl.setAttribute('inert', '');
   sheetEl.setAttribute('aria-hidden', String(!pageNav.open));
   canvas.classList.toggle('on-page', on); hit.classList.toggle('on-page', on);
+  card.classList.toggle('is-lifted', on);
 }
 function goPage(open, { settle = false } = {}) {
   if (pageNav.open === open && !pageNav.anim && !pageNav.drag && !pageNav.show) return;
@@ -1991,11 +1992,34 @@ function govern(now) {
   }
 }
 
+// Render cadence (this page). Every new frame of the bot also makes the phone recomposite the whole screen;
+// measured in Chrome on Android, drawing it at 60 fps was ~⅔ of the device's GPU time with the page sitting
+// still — headroom the scroll, the header and the sheet then lacked. On Android (and on any device the governor
+// has already found slow) it draws every frame only while something is actually moving — a touch on it, a drag
+// or carry, the sheet, a spin, a hop, the visor, the colour slider, a state change and a beat after — and at
+// 30 fps for its slow idle sway and glances, 20 fps asleep. Physics still step every frame, and the canvas
+// itself still moves at full rate (its position is a CSS transform).
+const IS_ANDROID = /Android/i.test(navigator.userAgent);
+let cadenceN = 0, busyUntil = 0;
+const keepBusy = (ms) => { busyUntil = Math.max(busyUntil, performance.now() + ms); };
+hit.addEventListener('pointerdown', () => keepBusy(1500), { passive: true });
+sheetEl.addEventListener('pointerdown', () => keepBusy(1200), { passive: true });
+function renderEvery(now) {
+  const moving = m.dragging || carry.active || carry.back || carry.removing || pageNav.show || pageNav.anim || pageNav.drag
+    || intro.active || colourSpin.active || m.airborne || Math.abs(m.spinV) > 0.03 || Math.abs(m.tiltV) > 0.03
+    || helmet.visorMoving || visorCue || gazeLock || poseBlend < 1 || (state !== 'idle' && state !== 'sleepy') || stateTime < 1;
+  if (moving) keepBusy(400);                                 // (and a short beat after it settles)
+  if (now < busyUntil || !(IS_ANDROID || renderer.getPixelRatio() <= GOV.min + 0.01)) return 1;
+  return state === 'sleepy' ? 3 : 2;
+}
+
 function frame(now) {
   if (carry.removed) return;                                 // dropped on the remove target: nothing left to draw
-  govern(now || performance.now());
+  now = now || performance.now();
+  govern(now);
   update(Math.min(clock.getDelta(), 1 / 30));
-  renderer.render(scene, camera);
+  cadenceN = (cadenceN + 1) % 6;
+  if (cadenceN % renderEvery(now) === 0) renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }
 

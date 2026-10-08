@@ -149,6 +149,9 @@ img.contain { object-fit: contain; }
   transform: translateY(-50%) scale(calc(1 - 0.5395 * var(--p)));
   opacity: var(--big);
 }
+.hdr.is-mini .tile__big { visibility: hidden; }   /* collapsed: nothing to see, and the GIF in one of them stops repainting */
+/* the animated Minutes GIF on its own small layer: each of its frames re-rasters just its 76 px box, not the header tiles around it */
+.tile__big img[src$=".gif"] { will-change: transform; }
 /* compact one-line wordmarks of the collapsed pills (app: noon / supermall / FOOD / MINUTES / Now) */
 .tile__mini {
   position: absolute; inset: 0;
@@ -669,6 +672,9 @@ img.contain { object-fit: contain; }
    355×768.7 at (10, 43) (scale 0.9467, r 18.93 on screen = 20 before scale),
    scrim → #000 at 80%, sheet → up from below the screen to y 233. */
 .home-card { position: absolute; inset: 0; overflow: hidden; transform-origin: 0 0; }
+/* while the sheet is up or moving, Home shrinks behind it on its own layer: the compositor scales the pixels it has,
+   instead of re-rasterising the whole page at every new scale (orbi/main.js setSheetLive) */
+.home-card.is-lifted { will-change: transform; }
 .sheet-scrim {
   position: absolute; inset: 0; z-index: 28;
   background: #000; opacity: 0; visibility: hidden;

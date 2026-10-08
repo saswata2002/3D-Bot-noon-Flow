@@ -4,9 +4,9 @@
 
   /* ── SKU cards (912:11004 et al.) ─────────────────────────────────── */
   const P = {
-    airpods:  { img: '00ff6.png', size: 122, title: 'Apple Airpods Pro 2 Wireless Earbuds' },
-    washer:   { img: '1a4eb.png', size: 142, title: 'Whirlpool 7 kg Magic Clean ' },
-    maynos:   { img: '6648e.png', size: 122, title: 'MAYNOS Suction Phone Case Mount', spacer: true },
+    airpods:  { img: '00ff6.webp', size: 122, title: 'Apple Airpods Pro 2 Wireless Earbuds' },
+    washer:   { img: '1a4eb.webp', size: 142, title: 'Whirlpool 7 kg Magic Clean ' },
+    maynos:   { img: '6648e.webp', size: 122, title: 'MAYNOS Suction Phone Case Mount', spacer: true },
   };
   // badge: [svg, right inset %] — Group 1686556680/1 ("express" / "express Today")
   const rails = {
@@ -55,7 +55,7 @@
     </article>`;
 
   /* ── Keep shopping for (912:11555) ───────────────────────────────── */
-  const IMG1234 = '<span class="ly clip" style="left:50%;top:calc(50% + 7.5px);width:86px;height:75px;transform:translate(-50%,-50%)"><img class="ab" style="left:-27.91%;top:-333.33%;width:393.02%;height:977.02%;object-fit:fill" src="' + A + 'e67d6.png" alt="" /></span>';
+  const IMG1234 = '<span class="ly clip" style="left:50%;top:calc(50% + 7.5px);width:86px;height:75px;transform:translate(-50%,-50%)"><img class="ab" style="left:-27.91%;top:-333.33%;width:393.02%;height:977.02%;object-fit:fill" src="' + A + 'e67d6.webp" alt="" /></span>';
   const big = { w: 114, h: 130, bg: '#f9f9fb', sc: '#f1f7fd' };
   const sm  = { w: 100, h: 114, bg: '#ebedff', sc: 'rgba(26,26,26,.09)' };
   const chipViewed  = { bg: '#f1f7fd', pad: '2px 2px 2px 4px', color: '#0076ff', icon: 'ef851.svg' };
@@ -63,14 +63,14 @@
   const chipSmPlain = { bg: 'transparent', pad: '0', color: '#0076ff', icon: 'e3e04.svg', w: 96 };
   const keep = [
     { id: '912:11556', box: big, search: true, name: 'Playstation 5', chip: [chipViewed, '2 Viewed'],
-      photo: `<span class="ly" style="left:calc(50% - 2.5px);top:calc(50% + 7.1px);width:129px;height:67px;transform:translate(-50%,-50%)"><img src="${A}5c6a4.png" alt="" /></span>` },
+      photo: `<span class="ly" style="left:calc(50% - 2.5px);top:calc(50% + 7.1px);width:129px;height:67px;transform:translate(-50%,-50%)"><img src="${A}5c6a4.webp" alt="" /></span>` },
     { id: '912:11581', box: big, search: true, name: 'Adidas Rivalry', chip: [chipViewed, '5 Viewed'],
-      photo: `<span class="ly" style="left:9px;top:16.6px;width:100px;height:100px"><img src="${A}89c98.png" alt="" /></span>` },
+      photo: `<span class="ly" style="left:9px;top:16.6px;width:100px;height:100px"><img src="${A}89c98.webp" alt="" /></span>` },
     { id: '912:11606', box: big, search: true, name: 'Body serum', chip: [chipViewed, '1 Viewed'],
-      photo: `<span class="ly" style="left:calc(50% - 2.78px);top:calc(50% + 3.53px);width:80px;height:82px;transform:translate(-50%,-50%)"><img src="${A}b27a1.png" alt="" /></span>` },
+      photo: `<span class="ly" style="left:calc(50% - 2.78px);top:calc(50% + 3.53px);width:80px;height:82px;transform:translate(-50%,-50%)"><img src="${A}b27a1.webp" alt="" /></span>` },
     { id: '912:11631', box: { w: 107, h: 122, bg: '#f9f9fb', sc: 'rgba(14,14,14,.04)' }, name: 'Evo Sl', tag: '#fff',
       chip: [{ bg: '#fff', pad: '2px 4px', color: '#af33d9', icon: '40a61.svg' }, '10 Products'],
-      photo: `<span class="ly" style="left:-1px;top:11.5px;width:100px;height:100px"><img src="${A}6b4ee.png" alt="" /></span>` },
+      photo: `<span class="ly" style="left:-1px;top:11.5px;width:100px;height:100px"><img src="${A}6b4ee.webp" alt="" /></span>` },
     { id: '912:11656', box: sm, small: true, name: 'Playstation 5', tag: 'rgba(255,255,255,.55)', chip: [chipSmBlue, '2 Products'], photo: IMG1234 },
     { id: '912:11681', box: sm, small: true, name: 'Playstation 5', tag: 'rgba(255,255,255,.55)', chip: [chipSmBlue, '2 Products'], photo: IMG1234 },
     { id: '912:11706', box: sm, small: true, name: 'Playstation 5', tag: 'rgba(255,255,255,.55)', chip: [chipSmPlain, '2 Products'], photo: IMG1234 },
@@ -137,10 +137,17 @@
   const HDR_MS = 300;
   const easeHdr = (t) => 1 - Math.pow(1 - t, 1.8);
   let p = 0, big = 1, mini = 0, collapsed = false, anim = null;
+  // The variables go on the header only (everything that reads them is inside it): set on #home they
+  // re-styled the whole page on every frame of the collapse, which Android phones felt. The body's
+  // ride-up is the one use outside the header, so it gets its transform directly.
+  const hdr = document.getElementById('hdr');
+  const pageEl = home.querySelector('.page');
+  const DH = parseFloat(getComputedStyle(home).getPropertyValue('--hdr-dh')) || 103;
   const paint = () => {
-    home.style.setProperty('--p', p.toFixed(4));
-    home.style.setProperty('--big', big.toFixed(3));
-    home.style.setProperty('--mini', mini.toFixed(3));
+    hdr.style.setProperty('--p', p.toFixed(4));
+    hdr.style.setProperty('--big', big.toFixed(3));
+    hdr.style.setProperty('--mini', mini.toFixed(3));
+    if (pageEl) pageEl.style.transform = `translate3d(0, ${(DH * (1 - p)).toFixed(2)}px, 0)`;
   };
   function setCollapsed(on) {
     if (on === collapsed) return;

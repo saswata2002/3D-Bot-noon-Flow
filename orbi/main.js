@@ -1934,8 +1934,25 @@ function update(dt) {
 
 }
 
-function frame() {
+// Resolution governor (this page): phones vary — on a GPU that can't keep up
+// (a sustained < ~45 fps, two seconds of it), the bot's drawing buffer steps
+// down a quarter of a pixel ratio at a time, 2 → 1.75 → 1.5, and stays there.
+// A phone that holds its frame rate never changes.
+const GOV = { from: performance.now() + 4000, ema: 16.7, last: 0, slow: 0, min: 1.5 };
+function govern(now) {
+  if (GOV.last) { const d = now - GOV.last; if (d < 250) GOV.ema += (d - GOV.ema) * 0.05; }
+  GOV.last = now;
+  if (now < GOV.from || document.hidden) { GOV.slow = 0; return; }
+  GOV.slow = GOV.ema > 22 ? GOV.slow + 1 : 0;
+  if (GOV.slow > 90 && renderer.getPixelRatio() > GOV.min + 0.01) {
+    renderer.setPixelRatio(Math.max(GOV.min, renderer.getPixelRatio() - 0.25));
+    GOV.slow = 0; GOV.from = now + 2000; GOV.ema = 16.7;
+  }
+}
+
+function frame(now) {
   if (carry.removed) return;                                 // dropped on the remove target: nothing left to draw
+  govern(now || performance.now());
   update(Math.min(clock.getDelta(), 1 / 30));
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
@@ -1946,4 +1963,4 @@ setState('idle', { quiet: true });
 requestAnimationFrame(frame);
 
 // small hook for automated checks
-window.orbi = { tilt, restoreBot, carry, look, pageNav, get dozed() { return dozed; }, poke, goPage, view, setState, nudge, cycleColour, get theme() { return THEMES[themeIdx].name; }, helmet, toggleVisor, advance: update, faceCanvas, intro, gaze, replay: () => { setState('idle', { quiet: true }); helmet.setVisorDown(false); syncVisor(); Object.assign(intro, { active: true, t: 0, scale: 0, greeted: false, popped: false }); }, get state() { return state; }, motion: m, bodyUniforms: uniforms, bodyMat, renderer, scene, camera };
+window.orbi = { gov: GOV, tilt, restoreBot, carry, look, pageNav, get dozed() { return dozed; }, poke, goPage, view, setState, nudge, cycleColour, get theme() { return THEMES[themeIdx].name; }, helmet, toggleVisor, advance: update, faceCanvas, intro, gaze, replay: () => { setState('idle', { quiet: true }); helmet.setVisorDown(false); syncVisor(); Object.assign(intro, { active: true, t: 0, scale: 0, greeted: false, popped: false }); }, get state() { return state; }, motion: m, bodyUniforms: uniforms, bodyMat, renderer, scene, camera };

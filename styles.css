@@ -261,6 +261,8 @@ img.contain { object-fit: contain; }
   background: rgba(0,0,0,.64);
   -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
 }
+/* Android: a backdrop blur inside scrolling content is re-blurred every frame; at 64 % black the 3px blur barely shows */
+.is-android .vid { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(0,0,0,.7); }
 .vid img { width: 20px; height: 20px; }
 
 /* Brand banner widget — p8, gap 8, 188-wide content */
@@ -573,8 +575,7 @@ img.contain { object-fit: contain; }
   position: relative;
   display: flex; align-items: center; justify-content: center;
   width: 189px; height: 48px; border-radius: 10px;
-  background: #000;
-  -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+  background: #000;   /* (an opaque fill: the backdrop blur it had could never show, and cost a blur pass per frame while scrolling) */
   font-family: var(--fig); font-weight: 500;
   font-size: 15px; line-height: 20px; color: #fff; text-transform: capitalize;
 }

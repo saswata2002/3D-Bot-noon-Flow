@@ -26,7 +26,9 @@ window.Haptics = (() => {
   const iOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const NATIVE = { tick: 'selection', snap: { type: 'medium', intensity: 0.8 }, edge: { type: 'rigid', intensity: 0.6 }, tap: 'light', success: 'success',
     pop: { type: 'medium', intensity: 0.7 }, heavy: { type: 'heavy', intensity: 1 }, error: 'error' };
-  const VIBE = { tick: 4, snap: 12, edge: 10, tap: 8, success: [10, 40, 16], pop: 12, heavy: 30, error: [22, 50, 22, 50, 34] };
+  // Android (Vibration API): many phone motors can't render a pulse much under ~8 ms, so these are a touch longer
+  // than the iOS-style taps they stand for — a tick is still the shortest, heavy/error the only long ones
+  const VIBE = { tick: 8, snap: 18, edge: 22, tap: 12, success: [14, 60, 24], pop: 18, heavy: 40, error: [30, 60, 30, 60, 40] };
   let label = null;
   const sw = () => {
     if (label && label.isConnected) return label;
@@ -74,7 +76,7 @@ window.Haptics = (() => {
   // land: 0..1 — a soft impact whose strength follows the touchdown speed
   const land = (i) => {
     const k = Math.max(0.3, Math.min(1, i));
-    fire('land', { type: 'soft', intensity: +k.toFixed(2) }, Math.round(5 + 9 * k));
+    fire('land', { type: 'soft', intensity: +k.toFixed(2) }, Math.round(8 + 14 * k));
   };
   return { tick: () => fire('tick'), snap: () => fire('snap'), edge: () => fire('edge'), tap: () => fire('tap'),
     success: () => fire('success'), pop: () => fire('pop'), heavy: () => fire('heavy'), error: () => fire('error'), land };
@@ -88,7 +90,8 @@ window.Haptics = (() => {
               (nothing when tapping the one already selected)
      success  add to cart (+)
      tap      everything else that's tappable
-   The bot, the Orbi sheet and its scrim play their own (orbi/main.js). */
+   The bot, the Orbi sheet and its scrim play their own (orbi/main.js); the sheet's composer
+   buttons theirs (orbi/colour-picker.js); the banner row ticks as a swipe brings a card in (app.js). */
 (() => {
   const H = window.Haptics;
   const KINDS = [

@@ -1136,7 +1136,7 @@ function startCarry(g) {
 const TRASH_REVEAL_PX = 14;          // a held bot must be dragged this far before the remove UI appears
 function carryTo(px, py, dt) {
   // Home only: the remove UI rises once the held bot is moved — a still long-press just picks it up
-  if (!carry.trash && !pageNav.open && Math.hypot(px - carry.fx0, py - carry.fy0) > TRASH_REVEAL_PX) showTrash(true);
+  if (!carry.trash && !pageNav.open && Math.hypot(px - carry.fx0, py - carry.fy0) > TRASH_REVEAL_PX) { showTrash(true); haptic('tick'); }   // (a tick as the remove target rises)
   const W = screenEl.clientWidth || 375, Hh = screenEl.clientHeight || 812, r = 34;   // keep the ball on screen
   const tx = THREE.MathUtils.clamp(carry.ox0 + px - carry.fx0, r - view.cx, W - r - view.cx);
   const ty = THREE.MathUtils.clamp(carry.oy0 + py - carry.fy0, 44 + r - view.cy, Hh - r - view.cy);

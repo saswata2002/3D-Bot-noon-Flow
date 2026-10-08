@@ -225,6 +225,17 @@ document.getElementById('screen')?.addEventListener('contextmenu', (e) => e.prev
     };
     const hold = () => { gliding = null; pausedUntil = performance.now() + PAUSE; };
     ['pointerdown', 'wheel', 'touchstart'].forEach((ev) => row.addEventListener(ev, hold, { passive: true }));
+    // haptics: while a swipe of yours drives the row (finger down, or its momentum just after), a tick each time
+    // a new card comes into place — the auto-advance glides silently
+    let driving = 0, shown = 0;
+    const nearest = () => { const s = stops(); let k = 0; for (let i = 1; i < s.length; i++) if (Math.abs(s[i] - row.scrollLeft) < Math.abs(s[k] - row.scrollLeft)) k = i; return k; };
+    row.addEventListener('pointerdown', () => { driving = Infinity; shown = nearest(); }, { passive: true });
+    ['pointerup', 'pointercancel'].forEach((ev) => row.addEventListener(ev, () => { driving = performance.now() + 900; }, { passive: true }));
+    row.addEventListener('scroll', () => {
+      if (gliding || performance.now() > driving) return;
+      const k = nearest();
+      if (k !== shown) { shown = k; window.Haptics && window.Haptics.tick(); }
+    }, { passive: true });
     new IntersectionObserver(([e]) => { visible = e.isIntersecting; }, { root: scroll }).observe(row);
     setInterval(() => {
       if (document.hidden || !visible || reduce.matches || gliding || performance.now() < pausedUntil) return;

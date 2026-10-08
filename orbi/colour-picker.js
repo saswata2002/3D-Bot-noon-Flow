@@ -273,15 +273,18 @@ export function mountColourPicker(api) {
     choose(i);
     kick(); armIdle();
   });
-  // anything else folds it away (the tap still does what it does)
+  // anything else folds it away (the tap still does what it does) — a light tick unless that tap plays its own
   addEventListener('pointerdown', (e) => {
-    if (isOpen && !track.contains(e.target)) close();
+    if (isOpen && !track.contains(e.target)) { if (!e.target.closest('#orbiHit, .sheet-scrim, button')) api.haptic('tick'); close(); }
   }, { capture: true, passive: true });
   addEventListener('keydown', (e) => {
     if (isOpen && e.key === 'Escape') { e.stopImmediatePropagation(); close(); }
   }, { capture: true });
-  // the composer is the sheet's content, not a drag handle
-  cmp.addEventListener('pointerdown', (e) => e.stopPropagation());
+  // the composer is the sheet's content, not a drag handle; its buttons press like iOS controls
+  cmp.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    if (!isOpen && e.target.closest('.cmp__plus, .cmp__mic, .cmp__voice')) api.haptic('tap');
+  });
 
   render();
   return {

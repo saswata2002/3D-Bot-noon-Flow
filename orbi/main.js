@@ -1033,7 +1033,7 @@ const hit = document.getElementById('orbiHit') || canvas;
 let gesture = null;
 
 hit.addEventListener('pointerdown', (e) => {
-  gesture = { x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, lt: performance.now(), t: performance.now(), moved: 0, axis: null, fired: false };
+  gesture = { x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, lt: performance.now(), t: performance.now(), t0: e.timeStamp, moved: 0, axis: null, fired: false };
   haptic('tap');
   if (intro.active) { const sp = m.spin; endIntro(); m.spin = sp; }   // grab takes over mid-turn
   if (colourSpin.active) { const sp = m.spin; endColourSpin(); m.spin = sp; }
@@ -1050,6 +1050,11 @@ hit.addEventListener('pointermove', (e) => {
   const now = performance.now();
   const dx = e.clientX - gesture.lx, dy = e.clientY - gesture.ly;
   const dt = Math.max(1, now - gesture.lt) / 1000;
+  // held still for the full hold before this move: that's a pick-up, even if no frame got to notice it yet
+  // (this page: a phone that stalls a few frames would otherwise read the drag as a swipe)
+  // (input timestamps, not handler time: a stall that delivers a quick swipe late must not look like a hold)
+  if (!gesture.carried && !gesture.axis && gesture.moved < AXIS_LOCK_PX && e.timeStamp - gesture.t0 >= CARRY.holdMs
+      && !pageNav.show && !pageNav.anim && !pageNav.drag && !carry.removing && !carry.removed && !carry.active) startCarry(gesture);
   gesture.lx = e.clientX; gesture.ly = e.clientY; gesture.lt = now;
   gesture.moved = Math.max(gesture.moved, Math.hypot(e.clientX - gesture.x, e.clientY - gesture.y));
   if (gesture.carried) { carryTo(e.clientX, e.clientY, dt); return; }   // picked up: it follows the finger
@@ -1081,13 +1086,19 @@ hit.addEventListener('pointermove', (e) => {
   if (dx) m.lastDir = Math.sign(dx);
 });
 
-function endGesture() {
+function endGesture(e) {
   if (!gesture) return;
   const g = gesture;
   gesture = null;
   m.dragging = false;
   hit.classList.remove('grabbing');
-  if (g.carried) { releaseCarry(performance.now() - g.lt > 80); return; }   // (held still before letting go: no fling)
+  if (g.carried) {
+    // where the finger actually lifted counts (this page): a slow phone can deliver one or two moves for a whole
+    // drag, so the last move may be far from the release point — e.g. it lifted on the cross but never 'arrived'
+    if (e && e.type === 'pointerup' && Number.isFinite(e.clientX)) carryTo(e.clientX, e.clientY, 1 / 60);
+    releaseCarry(performance.now() - g.lt > 80);   // (held still before letting go: no fling)
+    return;
+  }
   // stale velocity (pointer held still before release) shouldn't fling it
   const idle = performance.now() - g.lt;
   m.spinV = idle > 80 ? 0 : THREE.MathUtils.clamp(m.dragVel, -14, 14);
@@ -1473,6 +1484,36 @@ function goPage(open, { settle = false } = {}) {
   }
   setSheetLive(true);
 }
+// ─── fit to the phone's height (this page) ───────────────────────────────
+// The Figma frame is 375 × 812, but phones aren't: the page is laid out 375 wide
+// (index.html's viewport) and the real height varies — an Android phone with
+// Chrome's toolbar is ≈700–780. Everything the bot uses below the header is
+// anchored to the bottom edge like the nav: its spot above the nav, the drop
+// path onto the sheet, and the sheet itself (564 tall, 15 above the bottom).
+const FIGMA_H = 812, SHEET_TOP_MIN = 120;
+const BASE = { home: VIEW.home.cy, page: VIEW.page.cy, top: SHEET.top, land: SHOW.land.cy, c1: SHOW.c1.cy, c2: SHOW.c2.cy };
+let frameDy = 0;
+function fitFrame() {
+  const H = screenEl.clientHeight || FIGMA_H;
+  const dy = H - FIGMA_H;
+  if (dy === frameDy && fitFrame.done) return;
+  fitFrame.done = true;
+  const was = frameDy; frameDy = dy;
+  VIEW.home.cy = BASE.home + dy;
+  SHOW.land.cy = BASE.land + dy; SHOW.c1.cy = BASE.c1 + dy; SHOW.c2.cy = BASE.c2 + dy;
+  // the sheet keeps its 15 px bottom margin; on a very short screen it gets shorter rather than pushing the bot
+  // (which sits on its top edge) up into the status bar
+  SHEET.top = Math.max(SHEET_TOP_MIN, BASE.top + dy);
+  SHEET.travel = H - SHEET.top;
+  VIEW.page.cy = BASE.page + (SHEET.top - BASE.top);
+  sheetEl.style.top = `${SHEET.top}px`;
+  sheetEl.style.height = `${H - 15 - SHEET.top}px`;
+  if (!pageNav.show && !pageNav.anim && !pageNav.drag) {
+    view.cy += dy - was;                                     // wherever it is now (home or on the sheet), it moves with the edge
+    placePage();
+  }
+}
+
 function placePage() {
   const p = pageNav.p, pc = THREE.MathUtils.clamp(p, 0, 1);  // the sheet may overshoot; card + scrim stop at 1
   if (pc > 0) {
@@ -1960,6 +2001,8 @@ function frame(now) {
 
 drawFace(faceCur, 1);
 setState('idle', { quiet: true });
+fitFrame();
+addEventListener('resize', fitFrame);
 requestAnimationFrame(frame);
 
 // small hook for automated checks

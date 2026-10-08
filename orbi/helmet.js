@@ -242,9 +242,25 @@ function applyAccent(c) {
 }
 
 // ─── shell ────────────────────────────────────────────────────────────────
+function simplifyOutline(pts, eps) {   // Ramer–Douglas–Peucker, keeping both ends
+  const keep = new Uint8Array(pts.length); keep[0] = keep[pts.length - 1] = 1;
+  const stack = [[0, pts.length - 1]];
+  while (stack.length) {
+    const [i0, i1] = stack.pop();
+    const [ax, ay] = pts[i0], [bx, by] = pts[i1], dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy) || 1;
+    let worst = -1, wd = 0;
+    for (let i = i0 + 1; i < i1; i++) { const d = Math.abs((pts[i][0] - ax) * dy - (pts[i][1] - ay) * dx) / len; if (d > wd) { wd = d; worst = i; } }
+    if (worst > 0 && wd > eps) { keep[worst] = 1; stack.push([i0, worst], [worst, i1]); }
+  }
+  return pts.filter((_, i) => keep[i]);
+}
 function buildShell() {
   // bottom → top so the lathe's faces point outward
-  const lathe = new THREE.LatheGeometry(profile.map(([r, y]) => new THREE.Vector2(r, y)).reverse(), 320);
+  // (this page) The outline is sampled at 271 points, which the shell surface doesn't need: it's simplified
+  // (Ramer–Douglas–Peucker) to the points that keep it within 0.0012 units — ≈0.15 device px at the bot's
+  // largest size — and revolved in 128 steps. It was 271 × 320: 87k vertices (over the 65,535-index limit some
+  // Android GPUs have, which skipped the shell entirely) and 173k triangles, the bulk of the bot's GPU time.
+  const lathe = new THREE.LatheGeometry(simplifyOutline(profile, 0.0012).map(([r, y]) => new THREE.Vector2(r, y)).reverse(), 128);
   const mat = new THREE.MeshPhysicalMaterial({
     roughness: 0.3, clearcoat: 0.6, clearcoatRoughness: 0.14, side: THREE.DoubleSide,
   });
@@ -330,7 +346,7 @@ function buildEdgeBead() {
   }
   const loop = [...front, ...back].filter((p, i, a) => i === 0 || p.distanceTo(a[i - 1]) > 1e-4);
   return new THREE.Mesh(
-    new THREE.TubeGeometry(new THREE.CatmullRomCurve3(loop, true, 'centripetal'), 1400, 0.016, 16, true),
+    new THREE.TubeGeometry(new THREE.CatmullRomCurve3(loop, true, 'centripetal'), 700, 0.016, 8, true),   // (was 1400 × 16)
     new THREE.MeshPhysicalMaterial({ color: 0x0e0e0e, roughness: 0.38, clearcoat: 0.4, clearcoatRoughness: 0.25 }),
   );
 }
@@ -351,11 +367,11 @@ function buildLiner() {
   // pad sits a touch proud of the shell, so the shell never z-fights through it
   const curve = liftedCurve(P.liner, -R + 0.03);
   const mat = leatherMaterial();
-  const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 900, R, 40, false), mat);
+  const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 300, R, 14, false), mat);   // (was 900 × 40)
   g.add(tube);
   for (const t of [0, 1]) {                            // round caps
     // geometry baked in place, so the grain is evaluated in helmet space
-    const capGeo = new THREE.SphereGeometry(R, 40, 28);
+    const capGeo = new THREE.SphereGeometry(R, 20, 14);   // (was 40 × 28)
     const at = curve.getPoint(t);
     capGeo.translate(at.x, at.y, at.z);
     const cap = new THREE.Mesh(capGeo, mat);
@@ -583,7 +599,7 @@ function buildCrownPlate() {
   // moulded rounded edge all the way round
   const loop = [...rimTop, ...rimBot.reverse()].filter((p, i, arr) => i === 0 || p.distanceTo(arr[i - 1]) > 1e-4);
   group.add(new THREE.Mesh(
-    new THREE.TubeGeometry(new THREE.CatmullRomCurve3(loop, true, 'centripetal'), 1000, thick / 2, 16, true),
+    new THREE.TubeGeometry(new THREE.CatmullRomCurve3(loop, true, 'centripetal'), 500, thick / 2, 10, true),   // (was 1000 × 16)
     black,
   ));
   return group;
@@ -596,7 +612,7 @@ function buildSnap(side) {
   g.position.copy(base).addScaledVector(n, PLATE.lift + PLATE.thick / 2);   // seated on the plate
   g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), n);
   const ring = new THREE.Mesh(
-    new THREE.SphereGeometry(8 / PX, 64, 24, 0, Math.PI * 2, 0, Math.PI / 2),
+    new THREE.SphereGeometry(8 / PX, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2),   // (was 64 × 24)
     // spun metal: sphere uv runs around the cap axis, so the anisotropic
     // highlight streaks concentrically like a machined stud
     new THREE.MeshPhysicalMaterial({ color: 0xc9cfd6, metalness: 0.9, roughness: 0.32, anisotropy: 0.85 }),
@@ -604,7 +620,7 @@ function buildSnap(side) {
   ring.rotation.x = Math.PI / 2;
   ring.scale.set(1, 0.45, 1);
   const core = new THREE.Mesh(
-    new THREE.SphereGeometry(3.6 / PX, 48, 16, 0, Math.PI * 2, 0, Math.PI / 2),
+    new THREE.SphereGeometry(3.6 / PX, 24, 10, 0, Math.PI * 2, 0, Math.PI / 2),   // (was 48 × 16)
     new THREE.MeshPhysicalMaterial({ color: 0x9aa3ad, metalness: 0.9, roughness: 0.38, anisotropy: 0.85 }),
   );
   core.rotation.x = Math.PI / 2;
@@ -703,7 +719,7 @@ function buildGlassVisor() {
   // polished rim all the way round (the shield's moulded edge)
   const loop = [...rimTop, ...rimBot.reverse()].filter((p, i, a) => i === 0 || p.distanceTo(a[i - 1]) > 1e-4);
   const rim = new THREE.Mesh(
-    new THREE.TubeGeometry(new THREE.CatmullRomCurve3(loop, true, 'centripetal'), 900, 0.012, 12, true),
+    new THREE.TubeGeometry(new THREE.CatmullRomCurve3(loop, true, 'centripetal'), 450, 0.012, 8, true),   // (was 900 × 12)
     new THREE.MeshPhysicalMaterial({ color: 0x23262d, roughness: 0.18, clearcoat: 0.8, clearcoatRoughness: 0.05 }),
   );
   rim.name = 'Visor rim';

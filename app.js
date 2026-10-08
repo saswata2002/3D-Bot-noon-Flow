@@ -117,6 +117,10 @@
 
 
 
+// A long press inside the prototype opens no context menu (Android: "Download image" sheets; its long-press
+// gesture also cancels the touch the bot's hold-to-drag is using)
+document.getElementById('screen')?.addEventListener('contextmenu', (e) => e.preventDefault());
+
 /* ══ Home interactions — measured from the noon app recording ("home Page.mov",
    60fps, 402pt wide; every number below was read off its frames) ══════════════ */
 (() => {

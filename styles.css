@@ -25,8 +25,11 @@
   --blue-gray-600: #666d85;
 }
 
-* { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }   /* (Android draws a blue box on every tap otherwise) */
+html, body { margin: 0; padding: 0; overscroll-behavior: none; }   /* no pull-to-refresh / bounce: swiping down at the top or dragging the sheet must never reload */
+/* an app, not a document: a long press neither selects text nor drags/opens images (Android would also cancel the bot's hold-to-drag) */
+.screen { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.screen img { -webkit-user-drag: none; }
 body {
   min-height: 100vh; min-height: 100dvh;
   display: flex; align-items: center; justify-content: center;
@@ -598,7 +601,7 @@ img.contain { object-fit: contain; }
 .ic__pi { position: absolute; left: calc(50% - 0.83px); top: -9.17px; width: 147.173px; height: 130.821px; transform: translateX(-50%); }
 
 /* ══ 912:12987 Bottom Nav ═══════════════════════════════════════════════ */
-.bnav { position: absolute; left: 0.381px; top: 731px; width: 375px; height: 81px; z-index: 20; }
+.bnav { position: absolute; left: 0.381px; bottom: 0; width: 375px; height: 81px; z-index: 20; }   /* (Figma top 731 of 812: anchored to the bottom so any phone height keeps it on screen) */
 .bnav__bar {
   position: absolute; left: 0; top: -1px; width: 375px; height: 88px;
   background: #fff;

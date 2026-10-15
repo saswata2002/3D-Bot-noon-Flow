@@ -39,10 +39,23 @@ body {
   -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
 }
-p, h2 { margin: 0; font-weight: inherit; }
-img { display: block; max-width: none; }
-a { color: inherit; text-decoration: none; }
-button { all: unset; box-sizing: border-box; cursor: pointer; }
+/* (the element resets stop at the GitFlow Home: it brings its own styles — :where keeps them at zero specificity) */
+:where(p, h2):where(:not(#nkHome *)) { margin: 0; font-weight: inherit; }
+:where(img):where(:not(#nkHome *)) { display: block; max-width: none; }
+:where(a):where(:not(#nkHome *)) { color: inherit; text-decoration: none; }
+:where(button):where(:not(#nkHome *)) { all: unset; box-sizing: border-box; cursor: pointer; }
+
+/* ── Home = the "noon App GitFlow" project's Home (home-app/, mounted into #nkHome by its own bundle) ──
+   The kit lays its screens out for its 390-wide device (fixed widths in its tokens), so it renders at 390 and is
+   scaled to this 375 frame (×375/390) — its exact layout, proportionally. Its height follows the phone (this
+   frame's height × 390/375: 844 on an 812 frame, its own device), and its top inset is this page's status bar
+   (42.565 px, Figma 1093:108979 = 44.27 in its 390 units) instead of its 54. */
+.nk-home { position: absolute; inset: 0; overflow: hidden; }
+/* #nkHome > .nk-root (its theme root) > wrapper > PhoneFrame (frameless) > viewport */
+.nk-home > div { position: absolute !important; left: 0 !important; top: 0 !important; width: 390px !important; height: 104% !important;
+  transform: scale(0.961538) !important; transform-origin: 0 0 !important; }
+.nk-home > div > div, .nk-home [class*="_frameless_"] { width: 100% !important; height: 100% !important; box-shadow: none !important; }
+.nk-home [class*="_viewport_"] { width: 100% !important; height: 100% !important; --nk-inset-top: 44.27px !important; }
 
 /* ── primitives ──────────────────────────────────────────────────────── */
 .ab   { position: absolute; }

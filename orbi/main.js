@@ -751,7 +751,8 @@ function poke(e) {
 }
 ['pointerdown', 'pointerup', 'wheel', 'keydown', 'touchstart'].forEach((ev) => addEventListener(ev, poke, { capture: true, passive: true }));   // (the release counts: a long drag ends a fresh 10 s)
 addEventListener('pointermove', (e) => { if (e.buttons) poke(e); }, { capture: true, passive: true });
-document.getElementById('scroll')?.addEventListener('scroll', () => poke(), { passive: true });
+// (any scroll inside the Home — the GitFlow Home's feed and rails mount after this runs, so listen in the capture phase)
+addEventListener('scroll', (e) => { if (e.target instanceof Element && e.target.closest('#nkHome')) poke(); }, { capture: true, passive: true });
 // ─── visor first: greeting and sleeping happen with the visor up ──────────
 // Before it greets or falls asleep, a lowered visor swings up, and only once
 // it's up (VISOR_RAISE_MS — the snappy hinge spring is 95% open at ≈318 ms)
@@ -1259,9 +1260,10 @@ function updateRemoval() {
 // replays its intro — grows in place at its Home spot with a 360° turn,
 // greets, settles, then lowers its visor. Not removed → the taps do nothing extra.
 const RESTORE = { taps: 3, gap: 500 };
-const noonTile = document.querySelector('.sw .tile[aria-label="noon"]');
+// (the GitFlow Home's experience switcher: its noon tile is aria-label="noon", mounted after this runs — delegated)
 let noonTaps = [];
-if (noonTile) noonTile.addEventListener('click', () => {
+addEventListener('click', (e) => {
+  if (!(e.target instanceof Element) || !e.target.closest('#nkHome [aria-label="noon"]')) return;
   if (!carry.removed) { noonTaps = []; return; }
   const now = performance.now();
   if (noonTaps.length && now - noonTaps[noonTaps.length - 1] > RESTORE.gap) noonTaps = [];
@@ -1813,7 +1815,20 @@ function updateGaze(dt) {
 // let go. Two critically damped springs (ζ = 1, ~0.45 s, never overshoot) turn
 // it into head pitch and yaw. With no scrolling it eases back face-on and the
 // Idle glances resume.
-const pageScroll = document.getElementById('scroll');
+// (the page that scrolls: the GitFlow Home's feed — its tallest vertical scroller, found once it has mounted)
+let feedEl = null;
+function homeScroller() {
+  if (feedEl && feedEl.isConnected) return feedEl;
+  feedEl = null;
+  let best = 0;
+  for (const el of document.querySelectorAll('#nkHome .nk-scroll, #nkHome [class*="scroll" i]')) {
+    const st = getComputedStyle(el);
+    if (!/(auto|scroll)/.test(st.overflowY) || el.scrollHeight <= el.clientHeight + 40) continue;
+    if (el.scrollHeight > best) { best = el.scrollHeight; feedEl = el; }
+  }
+  if (feedEl) look.last = feedEl.scrollTop;
+  return feedEl;
+}
 const LOOK = {
   down: 0.3, up: 0.24,    // rad of pitch at full speed (+ = face down)
   left: 0.2,              // rad of yaw at full speed (− = left on screen)
@@ -1821,8 +1836,9 @@ const LOOK = {
   hold: 0.3,              // s the look holds after the page stops
   release: 4.5,           // 1/s: how fast it lets go after the hold (≈0.7 s)
 };
-const look = { pitch: 0, yaw: 0, vp: 0, vy: 0, speed: 0, still: 0, last: pageScroll ? pageScroll.scrollTop : 0, busy: false };
+const look = { pitch: 0, yaw: 0, vp: 0, vy: 0, speed: 0, still: 0, last: 0, busy: false };
 function updateLook(dt) {
+  const pageScroll = homeScroller();
   if (!pageScroll || dt <= 0) return;
   const top = pageScroll.scrollTop;
   const vel = (top - look.last) / dt;               // px/s, + = scrolling down

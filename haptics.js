@@ -82,39 +82,32 @@ window.Haptics = (() => {
     success: () => fire('success'), pop: () => fire('pop'), heavy: () => fire('heavy'), error: () => fire('error'), land };
 })();
 
-/* ── Page taps (the Product Upscale engine's tap listener, adapted to Home) ──
-   Controls play on touch-down, like iOS buttons. Anything inside a scroller
-   (the header tiles, rails, cards, tabs) plays on a clean release instead
-   (moved < 8px, < 600ms), so starting a swipe or a scroll on it never buzzes.
-     tick     a selection change: a Recommended tab, a bottom-nav item
-              (nothing when tapping the one already selected)
-     success  add to cart (+)
-     tap      everything else that's tappable
+/* ── Page taps (the Product Upscale engine's tap listener, on the GitFlow Home) ──
+   The Home is the "noon App GitFlow" project's (home-app/, #nkHome); its controls are <button> /
+   [role=button] (its Pressable), the tab bar a floating nav[data-variant]. Its own kit only buzzes on
+   page navigations (Android only), so this engine plays every tap, on iOS too:
+     tick     a tab in the tab bar (nothing when tapping the one already selected) — on touch-down
+     tap      anything else tappable in the Home — it all sits in the scrolling feed / rails, so on a
+              clean release (moved < 8px, < 600ms): starting a scroll or a swipe on it never buzzes
    The bot, the Orbi sheet and its scrim play their own (orbi/main.js); the sheet's composer
-   buttons theirs (orbi/colour-picker.js); the banner row ticks as a swipe brings a card in (app.js). */
+   buttons theirs (orbi/colour-picker.js). */
 (() => {
   const H = window.Haptics;
-  const KINDS = [
-    ['.sku__add', 'success'],
-    ['.tab, .bnav__it', 'tick'],
-    ['.sku__wish, .addr__wish, .addr__loc, .search, .vid, .summer__mute, .lc__btn', 'tap'],
-    ['.tile, .hw, .cat, .sku, .cp, .kc, .lc', 'tap'],
-  ];
-  const ANY = KINDS.map((k) => k[0]).join(', ');
-  const kindOf = (el) => KINDS.find(([q]) => el.matches(q))[1];
+  const TAPPABLE = '#nkHome button, #nkHome [role="button"], #nkHome a[href]';
   let pending = null;
   addEventListener('pointerdown', (e) => {
     pending = null;
-    const t = e.target.closest && e.target.closest(ANY);
+    const t = e.target.closest && e.target.closest(TAPPABLE);
     if (!t || e.target.closest('#orbiHit, .sheet, .sheet-scrim')) return;
-    const kind = kindOf(t);
-    if (kind === 'tick' && t.classList.contains('is-on')) return;          // already selected
-    if (t.closest('.scroll, .hscroll')) { pending = { kind, x: e.clientX, y: e.clientY, t: performance.now() }; return; }
-    H[kind]();
+    if (t.closest('#nkHome nav[data-variant]')) {                          // the tab bar
+      if (t.getAttribute('aria-current') !== 'page') H.tick();
+      return;
+    }
+    pending = { x: e.clientX, y: e.clientY, t: performance.now() };
   }, { capture: true, passive: true });
   addEventListener('pointerup', (e) => {
     const p = pending; pending = null;
-    if (p && Math.hypot(e.clientX - p.x, e.clientY - p.y) < 8 && performance.now() - p.t < 600) H[p.kind]();
+    if (p && Math.hypot(e.clientX - p.x, e.clientY - p.y) < 8 && performance.now() - p.t < 600) H.tap();
   }, { capture: true, passive: true });
   addEventListener('pointercancel', () => { pending = null; }, { capture: true, passive: true });
 })();

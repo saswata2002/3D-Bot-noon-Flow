@@ -687,7 +687,8 @@ img.contain { object-fit: contain; }
 .home-card { position: absolute; inset: 0; overflow: hidden; transform-origin: 0 0; }
 /* while the sheet is up or moving, Home shrinks behind it on its own layer: the compositor scales the pixels it has,
    instead of re-rasterising the whole page at every new scale (orbi/main.js setSheetLive) */
-.home-card.is-lifted { will-change: transform; }
+.home-card.is-lifted { will-change: transform; border-radius: 24px; }
+.home-card { transition: border-radius .2s cubic-bezier(.65, 0, .35, 1); }   /* (noon motion: radius on its own clock, never the move spring) */
 .sheet-scrim {
   position: absolute; inset: 0; z-index: 28;
   background: #000; opacity: 0; visibility: hidden;

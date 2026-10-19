@@ -1448,9 +1448,7 @@ const SHOW = {
   visorDelay: 140,                    // ms after settling before the visor flips open
   // (the hello waits for the visor to be fully up: VISOR_RAISE_MS; straight away if it's already up)
 };
-const PAGE_OUT = 280, PAGE_SETTLE = 380;
 const DISMISS_AT = 110;               // px of swipe past which letting go closes the sheet
-const VISOR_BACK_AT = 0.55;           // of the close: the visor starts dropping, so both land together
 const pageNav = { open: false, p: 0, lift: 0, anim: null, drag: null, show: null, pose: { pitch: 0, roll: 0 }, visorAt: 0, greetAt: 0, restoreVisor: false };
 function cubicBezier(x1, y1, x2, y2) {
   const cx = 3 * x1, bx = 3 * (x2 - x1) - cx, ax = 1 - cx - bx;
@@ -1465,8 +1463,6 @@ function cubicBezier(x1, y1, x2, y2) {
     return Y(t);
   };
 }
-const figmaEaseOut = cubicBezier(0, 0, 0.58, 1);
-const snappyOut = cubicBezier(0.32, 0.72, 0, 1);          // the close: quick start, firm stop
 const easeOutCubicS = (x) => 1 - (1 - x) ** 3;
 const bez = (a, b, c, d, u) => { const v = 1 - u; return v * v * v * a + 3 * v * v * u * b + 3 * v * u * u * c + u * u * u * d; };
 function setSheetLive(on) {                                  // layering + a11y while presented / animating
@@ -1476,19 +1472,44 @@ function setSheetLive(on) {                                  // layering + a11y 
   canvas.classList.toggle('on-page', on); hit.classList.toggle('on-page', on);
   card.classList.toggle('is-lifted', on);
 }
-function goPage(open, { settle = false } = {}) {
+// ─── the full page: ONE spring (noon motion — "one curve, one start frame") ───
+// Everything is one progress p (0 Home → 1 the page) on noon's MOVE spring (stiffness 280.6, damping 27.14:
+// ω 16.75, ζ .81 — 1.3 % overshoot, ≈544 ms), started in the tap's frame and driven by the same p:
+//   the page        y 100 % → 0 (never past the top — its bottom edge would lift off the frame)
+//   Home under it   scale 1 → .94, corners → 24 (own 200 ms clock), dimmed to 85 %  (noon's full-page modal)
+//   the bot         one arc from its spot to its rest at the page's top, growing to its page size, turning its
+//                   approved 360° on the way up, leaning into the motion; then visor (if down) → hello
+// Closing is the same spring back (carrying a swipe's velocity); a swipe follows the finger 1:1.
+const PAGE_SPRING = { omega: 16.75, zeta: 0.81 };           // opening: noon MOVE
+const PAGE_CLOSE = { omega: 18, zeta: 0.92 };               // closing: a touch quicker and near-critical (≈0.3 px over) — exits land quietly, no bounce at the FAB
+// the 360° on the way up turns on its own softer spring from the same frame (the colour spin's: ω 11, ζ .86, a light
+// push), so it's face-on just after the bot lands — a follow-through, not a whip (tied to the page it took 250 ms)
+const PAGE_TURN = { omega: 11, zeta: 0.86, kick: 3 };
+const UNDER = { scale: 0.94, dim: 0.15 };
+function flightAt(e) {                                       // the bot's arc, Home spot (e 0) → rest on the page (e 1)
+  const a = VIEW.home, b = VIEW.page;
+  // leaves upward (a little left), swings in to the centre from the right — a soft, single curve
+  const c1 = { cx: a.cx - 12, cy: a.cy - (a.cy - b.cy) * 0.55 }, c2 = { cx: b.cx + 64, cy: b.cy + 90 };
+  return { cx: bez(a.cx, c1.cx, c2.cx, b.cx, e), cy: bez(a.cy, c1.cy, c2.cy, b.cy, e), unit: THREE.MathUtils.lerp(a.unit, b.unit, THREE.MathUtils.clamp(e, 0, 1)) };
+}
+function goPage(open, { settle = false, v0 = 0, glide = 0 } = {}) {
   if (pageNav.open === open && !pageNav.anim && !pageNav.drag && !pageNav.show) return;
-  const fromHome = open && !settle && pageNav.p === 0 && !pageNav.anim && !pageNav.drag;
-  pageNav.open = open; pageNav.drag = null; pageNav.show = null; pageNav.anim = null; pageNav.visorAt = 0; pageNav.greetAt = 0;
-  if (!open || !settle) sheetEl.classList.remove('is-landed');   // travelling: round corners
+  const fromHome = open && !settle && pageNav.p <= 0.001 && !pageNav.anim && !pageNav.drag;
+  pageNav.open = open; pageNav.drag = null; pageNav.visorAt = 0; pageNav.greetAt = 0;
+  sheetEl.classList.remove('is-landed');                     // travelling: round corners
   if (!open && picker) picker.close();
   if (fromHome) {
     if (intro.active) endIntro();
     pageNav.restoreVisor = helmet.visorDown;
-    pageNav.show = { t0: performance.now(), last: 0, q: 0, qv: 0, s: Math.PI * 2, sv: 0, landed: false, arrived: false };
-  } else {
-    pageNav.anim = { t0: performance.now(), ms: open ? PAGE_SETTLE : PAGE_OUT, p0: pageNav.p, lift0: pageNav.lift, v0: { ...view }, v1: open ? VIEW.page : VIEW.home, p1: open ? 1 : 0, pose0: { ...pageNav.pose } };
+    haptic('snap');                                          // noon: impact medium for a gesture that moves a page
   }
+  // the bot starts from wherever it is: its offset from the arc fades out as p reaches the target
+  const here = { ...view }, arc0 = flightAt(pageNav.p);
+  pageNav.anim = { x: pageNav.p, v: v0, to: open ? 1 : 0, spin: fromHome, s: Math.PI * 2, sv: -PAGE_TURN.kick, x0: pageNav.p,
+    glide: glide ? { T: glide, t: 0, v0 } : null,         // a slow swipe's release: a curve that starts at the finger's speed
+    off: { cx: here.cx - arc0.cx, cy: here.cy - arc0.cy, unit: here.unit - arc0.unit }, last: 0, prev: here };
+  pageNav.show = fromHome ? pageNav.anim : null;             // (a scripted turn: the yaw spring stays out of it)
+  pageNav.lift = 0;
   setSheetLive(true);
 }
 // ─── fit to the phone's height (this page) ───────────────────────────────
@@ -1518,15 +1539,12 @@ function fitFrame() {
 
 function placePage() {
   const p = pageNav.p, pc = THREE.MathUtils.clamp(p, 0, 1);  // the sheet may overshoot; card + scrim stop at 1
-  if (pc > 0) {
-    const sc = 1 + (SHEET.scale - 1) * pc;
-    card.style.transform = `translate(${(SHEET.x * pc).toFixed(3)}px, ${(SHEET.y * pc).toFixed(3)}px) scale(${sc.toFixed(5)})`;
-    card.style.borderRadius = `${(SHEET.r * pc).toFixed(2)}px`;
-  } else { card.style.transform = ''; card.style.borderRadius = ''; }
-  scrim.style.opacity = (SHEET.scrim * pc).toFixed(4);
-  // status bar: dark → light content over the dimmed Home, and dark again once the white page slides under it
-  const pageTop = (1 - p) * SHEET.travel + pageNav.lift;
-  if (sbar) sbar.style.setProperty('--sb-ink', (pc * THREE.MathUtils.clamp((pageTop - 12) / 48, 0, 1)).toFixed(4));
+  if (pc > 0) {                                              // Home recedes under the page: scale about its centre
+    const sc = 1 - (1 - UNDER.scale) * pc, W = screenEl.clientWidth || 375, Hh = screenEl.clientHeight || 812;
+    card.style.transform = `translate(${(W * (1 - sc) / 2).toFixed(3)}px, ${(Hh * (1 - sc) / 2).toFixed(3)}px) scale(${sc.toFixed(5)})`;
+  } else card.style.transform = '';
+  scrim.style.opacity = (UNDER.dim * pc).toFixed(4);          // chained to the page (85 % brightness at rest)
+  if (sbar) sbar.style.setProperty('--sb-ink', '0');          // dark all the way: Home is only lightly dimmed, then the white page
   // (a full page never rises past the top: its bottom edge would lift off the frame and show Home under it)
   sheetEl.style.transform = `translateY(${(Math.max(0, (1 - p) * SHEET.travel) + pageNav.lift).toFixed(2)}px)`;
   frameView();
@@ -1536,56 +1554,56 @@ function placePage() {
   hit.style.top = `${(view.cy - 37.5 * s - pad).toFixed(2)}px`;
   hit.style.width = hit.style.height = `${(80 * s + 2 * pad).toFixed(2)}px`;
 }
-function updateShow(now) {
-  const sh = pageNav.show, ms = now - sh.t0;
-  if (ms < SHOW.drop) {                                      // 1 · the curved drop
-    const t = ms / SHOW.drop, u = t * t;                     // falling: accelerates from rest
-    view.cx = bez(VIEW.home.cx, SHOW.c1.cx, SHOW.c2.cx, SHOW.land.cx, u);
-    view.cy = bez(VIEW.home.cy, SHOW.c1.cy, SHOW.c2.cy, SHOW.land.cy, u);
-    view.unit = VIEW.home.unit;
-    pageNav.pose.pitch = SHOW.lean.pitch * easeOutCubicS(t);
-    pageNav.pose.roll = SHOW.lean.roll * Math.sin(Math.PI * t);
-    pageNav.p = 0;
-    placePage();
-    return;
+function stepPage(now) {
+  const a = pageNav.anim;
+  const dt = Math.min(0.05, a.last ? (now - a.last) / 1000 : 1 / 60); a.last = now;
+  const sp = a.to === 1 ? PAGE_SPRING : PAGE_CLOSE, w = sp.omega, z = sp.zeta, ws = PAGE_TURN.omega, zs = PAGE_TURN.zeta;
+  if (a.glide) {
+    // cubic Hermite: from where the finger let go, at the finger's speed, easing to rest on the target (no jolt
+    // on release, and the bot still lands softly)
+    const g = a.glide; g.t = Math.min(g.T, g.t + dt);
+    const u = g.t / g.T, u2 = u * u, u3 = u2 * u, T = g.T;
+    a.x = (2 * u3 - 3 * u2 + 1) * a.x0 + (u3 - 2 * u2 + u) * T * g.v0 + (-2 * u3 + 3 * u2) * a.to;
+    a.v = ((6 * u2 - 6 * u) * a.x0 + (3 * u2 - 4 * u + 1) * T * g.v0 + (-6 * u2 + 6 * u) * a.to) / T;
+    if (u >= 1) { a.x = a.to; a.v = 0; }
+  } else for (let left = dt; left > 1e-6; left -= 1 / 240) {
+    const h = Math.min(left, 1 / 240);
+    a.v += (w * w * (a.to - a.x) - 2 * z * w * a.v) * h;
+    a.x += a.v * h;
+    if (a.spin) { a.sv += (-ws * ws * a.s - 2 * zs * ws * a.sv) * h; a.s += a.sv * h; }
   }
-  if (!sh.landed) { sh.landed = true; sh.last = sh.t0 + SHOW.drop; haptic('land', 0.75); }
-  // 2 · the rise: an under-damped spring carries the sheet (and the bot on it) up
-  //   …and the 360°: its own spring, from rest at a full turn to face-on
-  const w = (2 * Math.PI) / SHOW.response, z = SHOW.zeta, H = 1 / 240;
-  const ws = SHOW.spin.omega, zs = SHOW.spin.zeta;
-  for (let left = (now - sh.last) / 1000; left > 0; left -= H) {
-    const h = Math.min(H, left);
-    sh.qv += (w * w * (1 - sh.q) - 2 * z * w * sh.qv) * h;
-    sh.q += sh.qv * h;
-    sh.sv += (-ws * ws * sh.s - 2 * zs * ws * sh.sv) * h;
-    sh.s += sh.sv * h;
-  }
-  sh.last = now;
-  const q = sh.q, rise = ms - SHOW.drop;
-  if (!sh.arrived && q >= 1) { sh.arrived = true; haptic('snap'); }        // 3 · it arrives
-  const lead = SHOW.lead * (1 - Math.min(1, q)) ** 2;
-  view.cx = VIEW.page.cx;
-  view.unit = THREE.MathUtils.lerp(VIEW.home.unit, VIEW.page.unit, q);
-  // riding the page: on its edge as it starts to rise (the old sheet's look), easing down to its rest spot at the top
-  const sink = easeOutCubicS(THREE.MathUtils.clamp(q, 0, 1));
-  view.cy = SHEET.top + Math.max(0, (1 - q) * SHEET.travel) + THREE.MathUtils.lerp(PAGE_EDGE, VIEW.page.cy - SHEET.top, sink) - lead;
-  const k = 1 - easeOutCubicS(Math.min(1, rise / 260));                   // straighten up as it lifts
-  pageNav.pose.pitch = SHOW.lean.pitch * k;
-  pageNav.pose.roll = 0;
-  // the real angular velocity goes to spinV, so the bot leans into the turn (as after a flick)
-  m.spin = sh.s; m.spinV = sh.sv;
-  pageNav.p = q;
+  const p = a.x;
+  // the bot: on its arc, plus whatever offset it started with, fading out as p reaches the target
+  const arc = flightAt(p), span = a.to - a.x0, k = Math.abs(span) > 1e-4 ? THREE.MathUtils.clamp((a.to - p) / span, 0, 1) : 0;
+  view.cx = arc.cx + a.off.cx * k; view.cy = arc.cy + a.off.cy * k; view.unit = arc.unit + a.off.unit * k;
+  // leaning into the motion (like a carried bot): sideways speed → roll, vertical → pitch; straight when still
+  const vx = (view.cx - a.prev.cx) / Math.max(dt, 1e-3), vy = (view.cy - a.prev.cy) / Math.max(dt, 1e-3);
+  a.prev = { cx: view.cx, cy: view.cy };
+  pageNav.pose.roll += (THREE.MathUtils.clamp(-vx * 0.0004, -0.22, 0.22) - pageNav.pose.roll) * Math.min(1, dt * 14);
+  pageNav.pose.pitch += (THREE.MathUtils.clamp(vy * 0.00018, -0.2, 0.2) - pageNav.pose.pitch) * Math.min(1, dt * 14);
+  if (a.spin) { m.spin = a.s; m.spinV = a.sv; }             // the 360° (its own spring, same start frame)
+  if (a.to === 0 && p < 0.45) restoreVisorNow();             // closing: a visor that was down drops in time to land with it
+  pageNav.p = p;
   placePage();
-  const spun = Math.abs(sh.s) < 0.02 && Math.abs(sh.sv) < 0.3;             // within ~1°, nearly still
-  if (spun && Math.abs(q - 1) < 0.002 && Math.abs(sh.qv) < 0.03) {         // settled
-    pageNav.show = null; pageNav.p = 1; Object.assign(view, VIEW.page);
-    sheetEl.classList.add('is-landed');
-    m.spin = 0; m.spinV = 0; m.home = 0; m.homing = true; m.glideF = 0; spinDetent = 0;
-    pageNav.pose.pitch = pageNav.pose.roll = 0;
-    placePage();
-    sheetEl.setAttribute('aria-hidden', 'false');
-    pageNav.visorAt = now + SHOW.visorDelay;                // visor (if down), then the greeting
+  const H = SHEET.travel;
+  if (a.to === 1 && !sheetEl.classList.contains('is-landed') && (1 - p) * H < 0.5) sheetEl.classList.add('is-landed');   // landed: corners square
+  const turned = !a.spin || (Math.abs(a.s) < 0.01 && Math.abs(a.sv) < 0.15);   // (≈0.6°)
+  if (Math.abs(a.to - p) * H < 0.5 && Math.abs(a.v) * H < 15 && turned) {       // visually at rest (< 0.5 px, < 15 px/s)
+    pageNav.anim = null; pageNav.show = null; pageNav.p = a.to; pageNav.pose.pitch = pageNav.pose.roll = 0;
+    if (a.spin) { m.spin = 0; m.spinV = 0; m.home = 0; m.homing = true; m.glideF = 0; spinDetent = 0; }
+    if (a.to === 1) {
+      Object.assign(view, VIEW.page);
+      placePage();
+      sheetEl.classList.add('is-landed');
+      sheetEl.setAttribute('aria-hidden', 'false');
+      pageNav.visorAt = now + SHOW.visorDelay;              // visor (if down), then the greeting
+    } else {
+      Object.assign(view, VIEW.home);
+      placePage();
+      setSheetLive(false);
+      haptic('land', 0.35);                                  // a soft landing back in its corner
+      restoreVisorNow();
+    }
   }
 }
 // the sheet's hello: the intro's greeting (eyes blink into ^^, smile, cheeks,
@@ -1615,26 +1633,7 @@ function updatePage() {
     pageNav.greetAt = 0;
     if (pageNav.open) greetOnSheet();
   }
-  if (pageNav.show) { updateShow(now); return; }
-  const a = pageNav.anim;
-  if (!a) return;
-  const t = Math.min(1, (now - a.t0) / a.ms), e = (a.p1 === 0 ? snappyOut : figmaEaseOut)(t);
-  if (a.p1 === 0 && t >= VISOR_BACK_AT) restoreVisorNow();   // closing: snap the visor back down on the way
-  pageNav.p = a.p0 + (a.p1 - a.p0) * e;
-  pageNav.lift = a.lift0 * (1 - e);
-  pageNav.pose.pitch = a.pose0.pitch * (1 - e);
-  pageNav.pose.roll = a.pose0.roll * (1 - e);
-  view.cx = THREE.MathUtils.lerp(a.v0.cx, a.v1.cx, e);
-  view.cy = THREE.MathUtils.lerp(a.v0.cy, a.v1.cy, e);
-  view.unit = THREE.MathUtils.lerp(a.v0.unit, a.v1.unit, e);
-  placePage();
-  if (t < 1) return;
-  pageNav.anim = null;
-  if (!pageNav.open) {                                       // back on Home: original layering
-    setSheetLive(false);
-    haptic('land', 0.35);                                    // a soft landing back in its corner
-    restoreVisorNow();
-  } else { sheetEl.setAttribute('aria-hidden', 'false'); sheetEl.classList.add('is-landed'); }
+  if (pageNav.anim) stepPage(now);
 }
 // swipe the sheet down to dismiss: everything follows the finger
 sheetEl.addEventListener('pointerdown', (e) => {
@@ -1666,8 +1665,15 @@ const endSheetDrag = () => {
   if (!d) return;
   pageNav.drag = null;
   const dy = (1 - pageNav.p) * SHEET.travel;
-  if (dy > DISMISS_AT || d.vy > 700) { if (!d.armed) haptic('tap'); goPage(false); }   // (a crossed drag already ticked)
-  else { pageNav.open = false; goPage(true, { settle: true }); }   // spring back open
+  const v0 = THREE.MathUtils.clamp(-d.vy / SHEET.travel, -8, 8);   // px/s down → progress/s (p falls as it goes down)
+  // noon motion: a fast flick (> 900 px/s) settles on the spring with its release velocity; slower releases
+  // carry on from the finger's speed and ease to rest (≈0.36 s; the spring would yank them ×3 in one frame)
+  const fast = Math.abs(d.vy) > 900;
+  const glide = fast ? 0 : 0.3 + 0.12 * Math.abs((dy > DISMISS_AT || d.vy > 700 ? 0 : 1) - pageNav.p);
+  // (a monotone glide: the release speed can't exceed 3 × distance / time)
+  const span = (to) => Math.abs(to - pageNav.p), cap = (to) => (glide ? Math.sign(v0) * Math.min(Math.abs(v0), 2.5 * span(to) / glide) : v0);
+  if (dy > DISMISS_AT || d.vy > 700) { if (!d.armed) haptic('tap'); goPage(false, { v0: cap(0), glide }); }   // (a crossed drag already ticked)
+  else { pageNav.open = false; goPage(true, { settle: true, v0: cap(1), glide }); }   // back open
 };
 sheetEl.addEventListener('pointerup', endSheetDrag);
 sheetEl.addEventListener('pointercancel', endSheetDrag);

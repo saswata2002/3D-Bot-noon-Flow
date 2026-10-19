@@ -136,7 +136,7 @@ scene.add(rim);
 // ~5× fewer pixels than a full-screen WebGL layer over a scrolling page.
 const VIEW = {
   home: { cx: 327, cy: 681.5, unit: 30 },        // 1068:81084 — 80×80 FAB at (287, 644)
-  page: { cx: 188, cy: 235.25, unit: 45 },      // 1086:90432 in 1086:92697 — 120×120 at (128, 179): body r 45 at (60, 56.25)
+  page: { cx: 187.5, cy: 122, unit: 45 },       // the full page (2026-10-19): at rest centred at its top, under the status bar (was on the 1086:92697 sheet's edge)
 };
 const view = { ...VIEW.home };
 // room around the ball for hops, the dizzy orbit, Zz and the soft shadows, even
@@ -1431,14 +1431,17 @@ const card = document.getElementById('homeCard');
 const scrim = document.getElementById('orbiScrim');
 const sheetEl = document.getElementById('orbiSheet');
 const sbar = document.getElementById('sbar');                 // 1093:108979, above the whole flow
-const SHEET = { top: 233, travel: 812 - 233, scale: 355 / 375, x: 10, y: 43, r: 20, scrim: 0.8 };
+// (2026-10-19: the sheet is a full page — top 0, travelling the whole frame height; fitFrame sets the real height)
+const SHEET = { top: 0, travel: 812, scale: 355 / 375, x: 10, y: 43, r: 20, scrim: 0.8 };
+const PAGE_EDGE = 2.25;               // px below the page's top edge where the bot sits as the page starts to rise (as on the old sheet)
 const SHOW = {
   drop: 340,                          // ms for the curved drop
   land: { cx: 188, cy: 779.25 },      // storyboard frame 2: 80×80 at (148, 741.7)
   c1: { cx: 232, cy: 676 },           // the arc leaves sideways (the storyboard's tangent)…
   c2: { cx: 188, cy: 702 },           // …and comes down vertically onto the bottom edge
   lean: { pitch: 0.32, roll: 0.28 },  // rad: face dips toward the fall, body leans into the curve
-  zeta: 0.72, response: 0.48,         // the rise spring
+  zeta: 0.81, response: 0.375,        // the rise spring: noon's MOVE spring (stiffness 280.6, damping 27.14 — ζ .81, ω 16.75);
+                                      // was ζ .72 / .48, whose ~3 % overshoot lifted the full page's bottom edge off the frame
   spin: { zeta: 0.8, omega: 10 },     // the 360° on the way up: a spring from rest — winds up, whips round,
                                       // face-on at ≈418 ms with a ≈5° overshoot (it was a 640 ms ease that started at full speed)
   lead: 35,                           // px the bot starts above the sheet's edge (closes as (1 − q)²)
@@ -1477,6 +1480,7 @@ function goPage(open, { settle = false } = {}) {
   if (pageNav.open === open && !pageNav.anim && !pageNav.drag && !pageNav.show) return;
   const fromHome = open && !settle && pageNav.p === 0 && !pageNav.anim && !pageNav.drag;
   pageNav.open = open; pageNav.drag = null; pageNav.show = null; pageNav.anim = null; pageNav.visorAt = 0; pageNav.greetAt = 0;
+  if (!open || !settle) sheetEl.classList.remove('is-landed');   // travelling: round corners
   if (!open && picker) picker.close();
   if (fromHome) {
     if (intro.active) endIntro();
@@ -1493,7 +1497,7 @@ function goPage(open, { settle = false } = {}) {
 // Chrome's toolbar is ≈700–780. Everything the bot uses below the header is
 // anchored to the bottom edge like the nav: its spot above the nav, the drop
 // path onto the sheet, and the sheet itself (564 tall, 15 above the bottom).
-const FIGMA_H = 812, SHEET_TOP_MIN = 120;
+const FIGMA_H = 812;
 const BASE = { home: VIEW.home.cy, page: VIEW.page.cy, top: SHEET.top, land: SHOW.land.cy, c1: SHOW.c1.cy, c2: SHOW.c2.cy };
 let frameDy = 0;
 function fitFrame() {
@@ -1504,13 +1508,8 @@ function fitFrame() {
   const was = frameDy; frameDy = dy;
   VIEW.home.cy = BASE.home + dy;
   SHOW.land.cy = BASE.land + dy; SHOW.c1.cy = BASE.c1 + dy; SHOW.c2.cy = BASE.c2 + dy;
-  // the sheet keeps its 15 px bottom margin; on a very short screen it gets shorter rather than pushing the bot
-  // (which sits on its top edge) up into the status bar
-  SHEET.top = Math.max(SHEET_TOP_MIN, BASE.top + dy);
-  SHEET.travel = H - SHEET.top;
-  VIEW.page.cy = BASE.page + (SHEET.top - BASE.top);
-  sheetEl.style.top = `${SHEET.top}px`;
-  sheetEl.style.height = `${H - 15 - SHEET.top}px`;
+  // the page is the whole frame (CSS), so it travels the phone's height; the bot's rest spot is top-anchored
+  SHEET.travel = H;
   if (!pageNav.show && !pageNav.anim && !pageNav.drag) {
     view.cy += dy - was;                                     // wherever it is now (home or on the sheet), it moves with the edge
     placePage();
@@ -1525,8 +1524,11 @@ function placePage() {
     card.style.borderRadius = `${(SHEET.r * pc).toFixed(2)}px`;
   } else { card.style.transform = ''; card.style.borderRadius = ''; }
   scrim.style.opacity = (SHEET.scrim * pc).toFixed(4);
-  if (sbar) sbar.style.setProperty('--sb-ink', pc.toFixed(4));   // status bar: dark → light content over the scrim
-  sheetEl.style.transform = `translateY(${((1 - p) * SHEET.travel + pageNav.lift).toFixed(2)}px)`;
+  // status bar: dark → light content over the dimmed Home, and dark again once the white page slides under it
+  const pageTop = (1 - p) * SHEET.travel + pageNav.lift;
+  if (sbar) sbar.style.setProperty('--sb-ink', (pc * THREE.MathUtils.clamp((pageTop - 12) / 48, 0, 1)).toFixed(4));
+  // (a full page never rises past the top: its bottom edge would lift off the frame and show Home under it)
+  sheetEl.style.transform = `translateY(${(Math.max(0, (1 - p) * SHEET.travel) + pageNav.lift).toFixed(2)}px)`;
   frameView();
   const s = view.unit / 30;                                  // the Figma frame box (80 at unit 30)
   const pad = 16 * pc;                                       // on the sheet: room for the raised visor (it rises above the frame)
@@ -1565,7 +1567,9 @@ function updateShow(now) {
   const lead = SHOW.lead * (1 - Math.min(1, q)) ** 2;
   view.cx = VIEW.page.cx;
   view.unit = THREE.MathUtils.lerp(VIEW.home.unit, VIEW.page.unit, q);
-  view.cy = SHEET.top + (1 - q) * SHEET.travel + (VIEW.page.cy - SHEET.top) - lead;   // riding the sheet's edge
+  // riding the page: on its edge as it starts to rise (the old sheet's look), easing down to its rest spot at the top
+  const sink = easeOutCubicS(THREE.MathUtils.clamp(q, 0, 1));
+  view.cy = SHEET.top + Math.max(0, (1 - q) * SHEET.travel) + THREE.MathUtils.lerp(PAGE_EDGE, VIEW.page.cy - SHEET.top, sink) - lead;
   const k = 1 - easeOutCubicS(Math.min(1, rise / 260));                   // straighten up as it lifts
   pageNav.pose.pitch = SHOW.lean.pitch * k;
   pageNav.pose.roll = 0;
@@ -1576,6 +1580,7 @@ function updateShow(now) {
   const spun = Math.abs(sh.s) < 0.02 && Math.abs(sh.sv) < 0.3;             // within ~1°, nearly still
   if (spun && Math.abs(q - 1) < 0.002 && Math.abs(sh.qv) < 0.03) {         // settled
     pageNav.show = null; pageNav.p = 1; Object.assign(view, VIEW.page);
+    sheetEl.classList.add('is-landed');
     m.spin = 0; m.spinV = 0; m.home = 0; m.homing = true; m.glideF = 0; spinDetent = 0;
     pageNav.pose.pitch = pageNav.pose.roll = 0;
     placePage();
@@ -1629,12 +1634,14 @@ function updatePage() {
     setSheetLive(false);
     haptic('land', 0.35);                                    // a soft landing back in its corner
     restoreVisorNow();
-  } else sheetEl.setAttribute('aria-hidden', 'false');
+  } else { sheetEl.setAttribute('aria-hidden', 'false'); sheetEl.classList.add('is-landed'); }
 }
 // swipe the sheet down to dismiss: everything follows the finger
 sheetEl.addEventListener('pointerdown', (e) => {
   if (!pageNav.open || pageNav.show) return;
+  if (e.target.closest('#orbiClose')) return;                // (the close button is a button, not a drag handle)
   pageNav.anim = null;
+  sheetEl.classList.remove('is-landed');                     // corners round as it lifts off
   pageNav.drag = { y0: e.clientY - ((1 - pageNav.p) * SHEET.travel + pageNav.lift), ly: e.clientY, lt: performance.now(), vy: 0, armed: false, edged: false };
   try { sheetEl.setPointerCapture(e.pointerId); } catch {}
 });
@@ -1645,7 +1652,7 @@ sheetEl.addEventListener('pointermove', (e) => {
   d.vy += ((e.clientY - d.ly) / dt - d.vy) * 0.35; d.ly = e.clientY; d.lt = now;
   const dy = e.clientY - d.y0;                               // sheet offset from its open position
   pageNav.p = 1 - Math.max(0, dy) / SHEET.travel;
-  pageNav.lift = dy < 0 ? dy * 0.25 : 0;                     // pulling up: a little rubber band
+  pageNav.lift = 0;                                          // (a full page: pulling up goes nowhere — the edge bump below says so)
   const armed = dy > DISMISS_AT;                             // haptics: a tick crossing the dismiss point (both ways)…
   if (armed !== d.armed) { d.armed = armed; haptic('tick'); }
   if (dy < -2 && !d.edged) { d.edged = true; haptic('edge'); }   // …and a bump pulling past the top
@@ -1666,6 +1673,8 @@ sheetEl.addEventListener('pointerup', endSheetDrag);
 sheetEl.addEventListener('pointercancel', endSheetDrag);
 scrim.addEventListener('pointerdown', () => { if (pageNav.open) haptic('tap'); });
 scrim.addEventListener('click', () => { if (pageNav.open) goPage(false); });
+document.getElementById('orbiClose')?.addEventListener('pointerdown', () => { if (pageNav.open) haptic('tap'); });
+document.getElementById('orbiClose')?.addEventListener('click', () => { if (pageNav.open) goPage(false); });
 addEventListener('keydown', (e) => { if (e.key === 'Escape' && pageNav.open) goPage(false); });
 
 // ─── colour slider on the Orbi sheet (orbi/colour-picker.js) ──────────────

@@ -7,7 +7,7 @@
 /* ── the stage ── */
 .st { position: absolute; inset: 0; z-index: 4; visibility: hidden; color: #fff; overflow: hidden; background: #050506; }
 .st.is-on { visibility: visible; }
-.st-glow { position: absolute; left: 0; right: 0; top: 0; height: var(--hh, 196px); pointer-events: none;
+.st-glow { position: absolute; left: 0; right: 0; top: 0; height: var(--hh, 150px); pointer-events: none;
   background: radial-gradient(70% 90% at -4% 30%, rgba(26, 120, 74, .62), rgba(26,120,74,0) 70%),
               radial-gradient(70% 90% at 104% 24%, rgba(104, 84, 196, .58), rgba(104,84,196,0) 70%),
               linear-gradient(180deg, #08090c 0%, #050506 100%); }
@@ -15,48 +15,29 @@
 .st-back { position: absolute; left: 14px; top: 62px; width: 44px; height: 44px; display: grid; place-items: center; z-index: 21; cursor: pointer; border-radius: 22px; }
 .st-back svg { width: 30px; height: 20px; fill: none; stroke: #fff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .st-back:active { background: rgba(255,255,255,.08); }
-.st-pill { position: absolute; right: 14px; top: 66px; height: 38px; padding: 0 14px 0 6px; display: inline-flex; align-items: center; gap: 8px; z-index: 21; cursor: pointer;
-  border-radius: 19px; background: linear-gradient(180deg, #1a2350, #121838); box-shadow: inset 0 0 0 1px rgba(140,160,255,.28), 0 6px 18px rgba(0,0,0,.35);
-  font: 600 14px/1 var(--noon); color: #fff; }
-.st-pill b { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; font-size: 17px; background: linear-gradient(180deg, #5b7cff, #3a55d8); transform: rotate(-8deg); box-shadow: 0 2px 6px rgba(0,0,0,.3); }
-.st-lede { position: absolute; left: 22px; top: var(--lede, 128px); font: 500 21px/29px var(--noon); letter-spacing: .01em; color: rgba(255,255,255,.94); }
-.st-title { position: absolute; left: 0; right: 0; top: var(--ty, 220px); text-align: center; pointer-events: none;
-  font: 900 34px/40px 'Playfair Display', 'Didot', 'Bodoni 72', Georgia, serif; letter-spacing: -0.01em;
-  background: linear-gradient(180deg, #ffffff 0%, #d9dce3 38%, #8a8f9c 52%, #f2f3f6 64%, #b6bac4 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
-  filter: drop-shadow(0 2px 0 rgba(0,0,0,.6)) drop-shadow(0 0 18px rgba(255,255,255,.12)); }
 /* the carousel: a 3D coverflow — the focused card faces you, its neighbours turn away */
-.st-car { position: absolute; left: 0; right: 0; top: var(--cy, 284px); height: 150px; perspective: 760px; perspective-origin: 50% 50%; touch-action: pan-y; cursor: grab; }
-.st-card { position: absolute; left: 50%; top: 0; width: 228px; height: 138px; margin-left: -114px; border-radius: 14px; overflow: hidden;
+.st-car { position: absolute; left: 0; right: 0; top: var(--cy, 284px); height: 172px; z-index: 2; perspective: 760px; perspective-origin: 50% 50%; touch-action: pan-y; cursor: grab; }
+.st-card { position: absolute; left: 50%; top: 0; width: 260px; height: 158px; margin-left: -130px; border-radius: 16px; overflow: hidden;
   background: var(--g); box-shadow: 0 18px 40px rgba(0,0,0,.55), inset 0 0 0 1.5px rgba(255,255,255,.55), inset 0 1px 0 rgba(255,255,255,.7);
   transform-style: preserve-3d; will-change: transform; backface-visibility: hidden; }
 :is(.st-card, .tx-front)::before { content: ''; position: absolute; inset: 0; pointer-events: none;      /* fine engraved lines, like a gift card */
   background: repeating-radial-gradient(140% 120% at 110% -20%, rgba(255,255,255,.0) 0 7px, rgba(255,255,255,.09) 7px 8px); }
 :is(.st-card, .tx-front)::after { content: ''; position: absolute; inset: 0; pointer-events: none;       /* a sheen that moves with the turn */
   background: linear-gradient(105deg, rgba(255,255,255,0) 30%, rgba(255,255,255,.28) 46%, rgba(255,255,255,0) 60%); transform: translateX(var(--sheen, 0%)); }
-:is(.st-card, .tx-front) .c-brand { position: absolute; left: 0; right: 0; top: 22px; text-align: center; font: 800 16px/20px var(--noon); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.25); }
+:is(.st-card, .tx-front) .c-brand { position: absolute; left: 0; right: 0; top: 26px; text-align: center; font: 800 18px/22px var(--noon); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.25); }
 :is(.st-card, .tx-front) .c-brand i { font-style: normal; margin-right: 6px; }
-:is(.st-card, .tx-front) .c-cap { position: absolute; left: 0; right: 0; top: 56px; text-align: center; font: 700 9px/12px var(--noon); letter-spacing: .28em; color: rgba(255,255,255,.92); }
-:is(.st-card, .tx-front) .c-band { position: absolute; left: 0; right: 0; bottom: 0; height: 58px; background: rgba(255,255,255,.14); border-top: 1px solid rgba(255,255,255,.22);
-  display: flex; align-items: baseline; justify-content: center; padding-top: 14px; font: 800 31px/1 var(--noon); letter-spacing: -0.01em; color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.28); white-space: nowrap; }
+:is(.st-card, .tx-front) .c-cap { position: absolute; left: 0; right: 0; top: 63px; text-align: center; font: 700 10px/12px var(--noon); letter-spacing: .28em; color: rgba(255,255,255,.92); }
+:is(.st-card, .tx-front) .c-band { position: absolute; left: 0; right: 0; bottom: 0; height: 66px; background: rgba(255,255,255,.14); border-top: 1px solid rgba(255,255,255,.22);
+  display: flex; align-items: baseline; justify-content: center; padding-top: 16px; font: 800 35px/1 var(--noon); letter-spacing: -0.01em; color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.28); white-space: nowrap; }
 :is(.st-card, .tx-front) .c-band small { font-size: 17px; font-weight: 700; margin-left: 4px; letter-spacing: .02em; }
 .st-card .c-dim { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; }
-.st-name { position: absolute; left: 0; right: 0; top: var(--ny, 452px); text-align: center; font: 500 16px/20px var(--noon); color: rgba(255,255,255,.55); }
-.st-offer { position: absolute; left: 0; right: 0; top: var(--oy, 478px); height: 50px; display: flex; align-items: center; justify-content: center; gap: 14px; }
-.st-offer b { font: 700 40px/48px var(--noon); letter-spacing: -0.02em; color: #fff; font-variant-numeric: tabular-nums; }
-.st-offer span { font: 400 30px/1 var(--noon); color: rgba(255,255,255,.85); }
-.st-offer i { font-style: normal; font-size: 34px; filter: drop-shadow(0 0 14px rgba(255,170,60,.7)); }
-.st-peek { position: absolute; left: 0; right: 0; top: var(--py, 534px); height: 30px; display: flex; align-items: center; justify-content: center; gap: 8px; font: 500 13px/16px var(--noon); color: rgba(255,255,255,.6); }
-.st-peek u { display: flex; text-decoration: none; }
-.st-peek img { width: 28px; height: 28px; border-radius: 14px; object-fit: contain; background: #fff; box-shadow: 0 0 0 2px #050506; margin-left: -8px; }
-.st-peek img:first-child { margin-left: 0; }
-.st-swap { will-change: transform, opacity, filter; }
 /* the plinth and the gold button */
-.st-plinth { position: absolute; left: 0; right: 0; top: var(--bl, 578px); height: 118px; pointer-events: none; }
+.st-plinth { position: absolute; left: 0; right: 0; top: var(--bl, 622px); height: 118px; pointer-events: none; }
 .st-plinth::before { content: ''; position: absolute; left: 0; right: 0; top: 18px; height: 54px;
   background: linear-gradient(180deg, #1b1b1e 0%, #0f0f11 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,.07); }
 .st-plinth::after { content: ''; position: absolute; left: 50%; top: 72px; width: 290px; height: 46px; margin-left: -145px;
   background: linear-gradient(180deg, #121214, #09090a); clip-path: polygon(6% 0, 94% 0, 100% 100%, 0 100%); }
-.st-grab { position: absolute; left: 50%; top: var(--by, 586px); width: 190px; height: 60px; margin-left: -95px; z-index: 6; cursor: pointer; background: transparent; touch-action: manipulation; }
+.st-grab { position: absolute; left: 50%; top: var(--by, 630px); width: 200px; height: 60px; margin-left: -95px; z-index: 6; cursor: pointer; background: transparent; touch-action: manipulation; }
 .st-grab::before { content: ''; position: absolute; left: -6px; right: -6px; top: 8px; height: 64px; border-radius: 18px; background: #0a0a0c; box-shadow: 0 10px 24px rgba(0,0,0,.6); }  /* the slot it sits in */
 .st-grab i { position: absolute; left: 0; right: 0; top: 10px; height: 54px; border-radius: 16px; background: linear-gradient(180deg, #e08d0c, #b8650a); }  /* its gold depth */
 .st-grab span { position: absolute; left: 0; right: 0; top: 0; height: 54px; border-radius: 16px; display: grid; place-items: center;
@@ -67,16 +48,13 @@
 .st-grab.is-ready span { animation: st-shine 2.4s cubic-bezier(.65,0,.35,1) infinite; }
 @keyframes st-shine { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.08); } }
 .st-grab:disabled { cursor: default; }
-.st-using { position: absolute; left: 0; right: 0; top: var(--uy, 666px); text-align: center; font: 500 14px/18px var(--noon); color: rgba(255,255,255,.9); pointer-events: none; }
-.st-using b { color: #ffcf3a; font-weight: 600; }
-.st-ban { position: absolute; left: 14px; right: 14px; top: var(--ay, 704px); height: 92px; border-radius: 14px; overflow: hidden; cursor: pointer;
-  background: linear-gradient(110deg, #c4382a 0%, #e8573a 55%, #d64630 100%); box-shadow: inset 0 0 0 1px rgba(255,255,255,.22); }
-.st-ban .b-art { position: absolute; left: 14px; top: 14px; width: 80px; height: 64px; }
-.st-ban .b-art img { position: absolute; width: 46px; height: 46px; object-fit: contain; border-radius: 10px; background: #fff; box-shadow: 0 6px 14px rgba(0,0,0,.25); }
-.st-ban .b-cap { position: absolute; left: 108px; top: 18px; font: 700 10px/14px var(--noon); letter-spacing: .2em; color: rgba(255,255,255,.85); }
-.st-ban .b-txt { position: absolute; left: 108px; top: 38px; right: 60px; font: 500 15px/19px var(--noon); color: #fff; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.st-ban .b-go { position: absolute; right: 14px; top: 28px; width: 36px; height: 36px; border-radius: 18px; display: grid; place-items: center; box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.7); }
-.st-ban .b-go svg { width: 14px; height: 14px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* the floor under the cards: a glow in the focused world's colour (color transitions; the gradient follows) */
+.st-floor { position: absolute; left: 50%; top: var(--fy, 416px); width: 340px; height: 90px; margin-left: -170px; pointer-events: none; color: #3d9be0;
+  background: radial-gradient(closest-side, currentColor, rgba(0,0,0,0)); opacity: .42; filter: blur(6px); transition: color .5s cubic-bezier(.65,0,.35,1); }
+/* the pager: one dot per world, the focused one a pill */
+.st-pager { position: absolute; left: 0; right: 0; top: var(--gy, 482px); height: 8px; display: flex; justify-content: center; gap: 8px; pointer-events: none; }
+.st-pager i { width: 6px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.28); transition: width .32s cubic-bezier(.33,1,.68,1), background-color .32s cubic-bezier(.33,1,.68,1); }
+.st-pager i.on { width: 20px; background: #fff; }
 /* the claw (hangs from Orbi) */
 .st-cable { position: absolute; left: 0; top: 0; width: 2px; margin-left: -1px; transform-origin: 50% 0; z-index: 8; background: linear-gradient(180deg, #9aa0ad, #e4e6eb); opacity: 0; will-change: transform, height; }
 .st-claw { position: absolute; left: 0; top: 0; width: 64px; height: 56px; margin-left: -32px; transform-origin: 32px 0; z-index: 9; opacity: 0; will-change: transform; }
@@ -95,7 +73,7 @@
   background: repeating-conic-gradient(from 0deg, rgba(255,255,255,.18) 0deg 6deg, rgba(255,255,255,0) 6deg 18deg); -webkit-mask: radial-gradient(circle, #000 0%, rgba(0,0,0,0) 60%); mask: radial-gradient(circle, #000 0%, rgba(0,0,0,0) 60%); }
 .tx-spark { position: absolute; left: 0; top: 0; width: 0; height: 0; }
 .tx-spark i { position: absolute; width: 6px; height: 6px; border-radius: 50%; background: #fff; box-shadow: 0 0 10px 2px rgba(255,255,255,.8); will-change: transform, opacity; }
-.tx-card { position: absolute; left: 0; top: 0; width: 228px; height: 138px; border-radius: 14px; transform-style: preserve-3d; will-change: transform; transform-origin: 50% 50%; }
+.tx-card { position: absolute; left: 0; top: 0; width: 260px; height: 158px; border-radius: 16px; transform-style: preserve-3d; will-change: transform; transform-origin: 50% 50%; }
 .tx-card > div { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
 .tx-card .tx-front { background: var(--g); box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.55); }
 .tx-card .tx-back { background: var(--g); transform: rotateY(180deg); display: grid; place-items: center; text-align: center; }

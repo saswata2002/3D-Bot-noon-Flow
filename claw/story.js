@@ -72,7 +72,7 @@ export function mountStory(ctx) {
       html: (d) => `<div class="ws-half t"><div class="ws-rings">${checkerRings()}</div></div><div class="ws-half b"><div class="ws-rings">${checkerRings()}</div></div>
         <div class="ws-year"><span>20</span><span>26</span></div>
         ${squiggle(0, '#0E0E0E')}
-        <div class="ws-copy"><div class="ws-h">We're ready<br>for you, ${d.USER.name}.</div><div class="ws-s">Your 2026 on noon, wrapped by Orbi</div></div>
+        <div class="ws-copy"><div class="ws-h">We're ready<br>for you, ${d.USER.name}.</div><div class="ws-s">Your 2026 on noon, wrapped</div></div>
         <div class="ws-band"><div class="ws-btrack">${'<b>2026</b>'.repeat(4)}</div></div>`,
       async play(el, { sw }, o) {
         const halves = [...el.querySelectorAll('.ws-half')], rings = [...el.querySelectorAll('.ws-rings')], year = el.querySelector('.ws-year');
@@ -155,7 +155,7 @@ export function mountStory(ctx) {
         const L = ctx.layout();
         el.style.setProperty('--cy', `${L.cy}px`);
         el.querySelector('.ws-copy').style.top = `${Math.round(L.cy - 132)}px`;
-        el.querySelector('.ws-cap').style.top = `${Math.round(L.cy + 170)}px`;
+        el.querySelector('.ws-cap').style.top = `${Math.round(L.cy + 200)}px`;
         // the five worlds as a stack in the carousel's exact spot and pose (spread 0)
         const stack = el.querySelector('.ws-stack');
         stack.innerHTML = ctx.cardsHTML();

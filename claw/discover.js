@@ -13,10 +13,10 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 
 // each set's story: the hero line, Orbi's lines per section, its coupons
 const STORY = {
-  gym: { cap: 'Gym essentials', lede: 'Lift heavier, stretch deeper — Orbi\'s pick of the gear you keep coming back for.', spot: 'My #1 pick for your gains 💪 Drag to spin it', code: 'LIFT' },
+  gym: { cap: 'Gym essentials', lede: 'Lift heavier, stretch deeper — the gear you keep coming back for, picked for you.', spot: 'My #1 pick for your gains 💪 Drag to spin it', code: 'LIFT' },
   tech: { cap: 'Audio & wearables', lede: 'Earbuds, watches and the small things that make every day sound better.', spot: 'This one\'s a crowd favourite 🎧 Drag to spin it', code: 'TECH' },
   scents: { cap: 'Perfumes', lede: 'Signature scents for every mood — from the office to a night out.', spot: 'Smells like a 5-star review ✨ Drag to spin it', code: 'SCENT' },
-  glow: { cap: 'Skincare', lede: 'Serums, sunscreens and the glow-up kit Orbi would put in your bag.', spot: 'Your skin will thank you 💖 Drag to spin it', code: 'GLOW' },
+  glow: { cap: 'Skincare', lede: 'Serums, sunscreens and the glow-up kit worth putting in your bag.', spot: 'Your skin will thank you 💖 Drag to spin it', code: 'GLOW' },
   home: { cap: 'Kitchen appliances', lede: 'The upgrades that make home feel like a five-star kitchen.', spot: 'Chef\'s kiss 👨‍🍳 Drag to spin it', code: 'HOME' },
 };
 const LINES = { deck: 'Swipe through — tap + to add 👉', tix: 'Coupons! Tap one to copy 🎟️', grid: 'Small prices, big vibes', end: 'Fancy another go? 🎰' };
@@ -43,26 +43,26 @@ export function mountDiscover(ctx) {
       <div class="t-row"><b><small>AED</small>${aed(p.price)}</b>${pct(p) >= 5 ? `<u>-${pct(p)}%</u>` : `<u>★ ${p.rating || '4.5'}</u>`}<button class="dv-q" type="button" aria-label="Add to cart">+</button></div></div></div>`;
     scroller.innerHTML = `
       <div class="dv-hero"><div class="h-in">
-        <div class="dv-cap">🏆 ORBI'S PICK · ${esc(st.cap.toUpperCase())}</div>
+        <div class="dv-cap">🏆 PICK OF THE DAY · ${esc(st.cap.toUpperCase())}</div>
         <div class="dv-h1">${esc(s.name)}</div>
         <div class="dv-lede">${esc(st.lede)}</div>
         <div class="dv-timer"><i></i><span>Deal ends in <b class="dv-clock">--:--:--</b></span></div>
       </div></div>
       <div class="dv-sec dv-rv" data-say="spot">
-        <div class="dv-spot"><span class="s-tag">🏆 ORBI'S #1</span>${pct(spot) >= 5 ? `<span class="s-off">-${pct(spot)}%</span>` : ''}
+        <div class="dv-spot"><span class="s-tag">🏆 TOP PICK</span>${pct(spot) >= 5 ? `<span class="s-off">-${pct(spot)}%</span>` : ''}
           <div class="s-stage"><div class="s-disc"></div><div class="s-img"><img src="${spot.img}" alt="" decoding="async"></div></div>
           <div class="s-meta"><b>${esc(short(spot.title, 80))}</b><span><small style="font-size:13px;font-weight:600">AED</small> ${aed(spot.price)}${spot.was && spot.was > spot.price ? `<s>AED ${aed(spot.was)}</s><em>-${pct(spot)}%</em>` : ''}</span></div>
           <button class="dv-add" type="button"><span>Add to cart</span></button></div></div>
-      <div class="dv-sec dv-rv" data-say="deck"><h3>Orbi's ${rest.length} more <em>swipe →</em></h3><div class="dv-deck">${rest.map(tile).join('')}</div></div>
+      <div class="dv-sec dv-rv" data-say="deck"><h3>${rest.length} more picks <em>swipe →</em></h3><div class="dv-deck">${rest.map(tile).join('')}</div></div>
       <div class="dv-sec dv-rv" data-say="tix"><h3>Unlocked for you <em>${best}% max</em></h3><div class="dv-tix">
-        ${[[`${Math.min(15, Math.max(10, Math.round(best / 6)))}%`, `${st.code}10`, `Extra off Orbi's picks`, 'Min. spend AED 150 · today only'],
+        ${[[`${Math.min(15, Math.max(10, Math.round(best / 6)))}%`, `${st.code}10`, `Extra off today's picks`, 'Min. spend AED 150 · today only'],
            ['AED 25', 'NOONONE', 'noon One members', 'On orders over AED 200'],
            ['FREE', 'SHIPFREE', 'Free express delivery', `On everything in ${s.name}`]]
           .map(([l, c, b, t]) => `<div class="dv-tik"><div class="k-l">${l}</div><div class="k-r"><b>${esc(b)}</b><span>${esc(t)}</span></div><button class="k-copy" type="button" data-code="${c}">${c}</button></div>`).join('')}
       </div></div>
       <div class="dv-sec dv-rv" data-say="grid"><h3>Steals under AED ${cap} <em>${steals.length} picks</em></h3><div class="dv-grid">${steals.map(tile).join('')}</div></div>
-      <div class="dv-end dv-rv" data-say="end"><b>Not quite your vibe?</b><span>Orbi has four more worlds in the machine.</span>
-        <button class="dv-again" type="button">Let Orbi grab again</button>
+      <div class="dv-end dv-rv" data-say="end"><b>Not quite your vibe?</b><span>Four more worlds are waiting in the machine.</span>
+        <button class="dv-again" type="button">Grab again</button>
         <button class="dv-all" type="button">Explore all ${esc(st.cap.toLowerCase())} on noon →</button></div>
       <div class="dv-pad"></div>`;
     dv.style.setProperty('--g', s.grad); dv.style.setProperty('--a', s.glow);

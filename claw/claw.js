@@ -74,18 +74,11 @@ root.innerHTML = `
   <div class="st">
     <div class="st-glow"></div>
     <button class="st-back" type="button" aria-label="Close"><svg viewBox="0 0 30 20" aria-hidden="true"><path d="M29 10H2M10 2L2 10l8 8"/></svg></button>
-    <button class="st-pill" type="button"><b>🎁</b><span>my picks</span></button>
-    <div class="st-lede">let Orbi grab you<br>a deal from 5 worlds</div>
-    <div class="st-title">PICK OF THE DAY</div>
     <div class="st-car" data-no-drag></div>
-    <div class="st-name st-swap"></div>
-    <div class="st-offer st-swap"><b></b><span>+</span><i>🎁</i></div>
-    <div class="st-peek st-swap"><u></u><span></span></div>
+    <div class="st-floor"></div>
+    <div class="st-pager">${'<i></i>'.repeat(5)}</div>
     <div class="st-plinth"></div>
     <button class="st-grab" type="button" aria-label="Grab a deal"><i></i><span>GRAB</span></button>
-    <div class="st-using">using <b>🪙 1</b> free play</div>
-    <div class="st-ban" role="button" aria-label="noon One offer"><div class="b-art"></div><div class="b-cap">NOON ONE</div>
-      <div class="b-txt">Extra 10% off everything Orbi grabs today</div><div class="b-go"><svg viewBox="0 0 14 14" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4"/></svg></div></div>
     <div class="st-cable"></div><div class="st-claw">${CLAW_SVG}</div>
   </div>
   <div class="tx"><div class="tx-flood"></div><div class="tx-rays"></div><div class="tx-spark"></div></div>
@@ -99,12 +92,11 @@ const story = $('.cx-story'), progress = [];                         // (no stor
 const say = $('.cx-say'), burst = $('.cx-burst'), confetti = $('.cx-confetti');
 const groundEl = $('.cx-ground');
 const st = $('.st'), car = $('.st-car');
-const nameEl = $('.st-name'), offerEl = $('.st-offer'), peekEl = $('.st-peek'), grabBtn = $('.st-grab'), usingEl = $('.st-using'), banEl = $('.st-ban');
+const grabBtn = $('.st-grab'), pagerEl = $('.st-pager'), floorEl = $('.st-floor'), dots = [...pagerEl.children];
 const cableEl = $('.st-cable'), clawEl = $('.st-claw'), prongs = [...clawEl.querySelectorAll('.pr')];
 const tx = $('.tx'), flood = $('.tx-flood'), rays = $('.tx-rays'), sparks = $('.tx-spark');
 const expander = document.createElement('div');                 // the hand-off layer out to noon's PLP
 expander.className = 'cx-expander'; expander.innerHTML = '<i></i>'; root.appendChild(expander);
-banEl.querySelector('.b-art').innerHTML = [ORDER[0].products[0], ORDER[2].products[1]].map((p, k) => `<img src="${p.img}" alt="" style="left:${k * 30}px;top:${k * 14}px;transform:rotate(${k ? 8 : -8}deg)">`).join('');
 
 let run = 0, played = false, phase = 'off';
 const alive = (r) => r === run;
@@ -182,16 +174,17 @@ async function runIntro(r) {
 // ─── 2 · the stage: "Pick of the day" ──────────────────────────────────────────────────────────────────
 car.innerHTML = ORDER.map(cardHTML).join('');
 const cards = [...car.querySelectorAll('.st-card')];
-const L = { H: 0, cy: 0, k: 1, ban: true };
-const ORBI_HOME = () => ({ cx: 322, cy: L.lede + lerp(22, 24, L.k), unit: 22 });       // where the reference has its round button
+const L = { H: 0, cy: 0, k: 1, hh: 150 };
+const CW = 260, CH = 158, SPREAD = 236, FAR = 110;                       // card size, neighbour offset, far offset
+const ORBI_HOME = () => ({ cx: 322, cy: 84, unit: 22 });              // top right, level with the back arrow
 function layoutStage() {
+  // a quiet header, then the carousel centred between it and the GRAB plinth (the page is the cards)
   const Hh = sheet.clientHeight, k = clamp((Hh - 691) / (812 - 691), 0, 1);
-  const hh = lerp(166, 196, k), lede = lerp(100, 122, k), ty = lerp(204, 222, k), cy = lerp(256, 284, k);
-  const ny = cy + 138 + lerp(18, 30, k), oy = ny + 24, py = oy + 54, bl = py + lerp(32, 44, k), by = bl + 8, uy = by + 80, ay = uy + 38;
-  Object.assign(L, { H: Hh, k, cy, lede, ban: ay + 92 <= Hh - 12 });
-  const v = { hh, lede, ty, cy, ny, oy, py, bl, by, uy, ay };
-  for (const [n, x] of Object.entries(v)) st.style.setProperty(`--${n}`, `${x.toFixed(1)}px`);
-  banEl.style.display = L.ban ? '' : 'none';
+  const hh = lerp(136, 150, k), bl = Hh - lerp(176, 190, k), by = bl + 8;
+  const cy = Math.round((hh + bl) / 2 - CH / 2 - lerp(14, 22, k));
+  const fy = cy + CH - 26, gy = cy + CH + lerp(30, 40, k);
+  Object.assign(L, { H: Hh, k, cy, hh });
+  for (const [n, x] of Object.entries({ hh, bl, by, cy, fy, gy })) st.style.setProperty(`--${n}`, `${x.toFixed(1)}px`);
 }
 
 // the carousel: `pos` is a float card index; every card is placed from its offset to it (a coverflow)
@@ -202,7 +195,7 @@ const STACK_RZ = [0, -7, 5, -3, 8];
 function poseOf(i, pos, s = 1) {
   let d = i - pos; d = ((d % N) + N + N / 2) % N - N / 2;              // −2.5 … 2.5
   const ad = Math.abs(d), s1 = Math.min(ad, 1);
-  const x = Math.sign(d) * (ad <= 1 ? ad * 206 : 206 + (ad - 1) * 96);
+  const x = Math.sign(d) * (ad <= 1 ? ad * SPREAD : SPREAD + (ad - 1) * FAR);
   const rot = clamp(d, -1, 1) * 42, z = -s1 * 80 - Math.max(0, ad - 1) * 60, sc = 1 - s1 * 0.12;
   const op = ad > 1.5 ? Math.max(0, 1 - (ad - 1.5) * 2.4) : 1;
   return {
@@ -254,25 +247,11 @@ function stageTick(now) {
   placeSay();
   requestAnimationFrame(stageTick);
 }
-// the set under the focused card: its name, its best offer, a peek at three of its picks
-let infoSwap = null;
-function fillInfo(s) {
-  nameEl.textContent = s.name;
-  offerEl.querySelector('b').textContent = `${s.best}%`;
-  const from = Math.min(...s.products.map((p) => p.price));
-  peekEl.querySelector('u').innerHTML = s.products.slice(0, 3).map((p) => `<img src="${p.img}" alt="" decoding="async">`).join('');
-  peekEl.querySelector('span').textContent = `${s.products.length} picks · from AED ${Math.floor(from)}`;
-}
-function showInfo(s, { quiet = false } = {}) {
-  const els = [nameEl, offerEl, peekEl];
-  if (quiet || reduce.matches) { fillInfo(s); return; }
-  // a quick swap: out 120 ms (fade out, a nudge), new content in on MOVE + 200 ms fade (25 / 60 ms staggers)
-  const dir = C.v > 0 ? -1 : 1, id = {}; infoSwap = id;
-  Promise.all(els.map((el, i) => anim(el, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: `translateX(${dir * 14}px)` }], { duration: 120, easing: EASE.out, delay: i * 25 }).finished.catch(() => {}))).then(() => {
-    if (infoSwap !== id) return;
-    fillInfo(s);
-    els.forEach((el, i) => anim(el, [{ opacity: 0, transform: `translateX(${-dir * 18}px)` }, { opacity: 1, transform: 'none' }], { duration: MOVE.ms, easing: EASE.move, delay: i * 60 }));
-  });
+// the focused world: its dot in the pager, its colour in the glow on the floor under the cards
+function showInfo(s) {
+  const i = ORDER.indexOf(s);
+  dots.forEach((d, k) => d.classList.toggle('on', k === i));
+  floorEl.style.color = s.glow;
 }
 // drag / flick / tap the carousel
 car.addEventListener('pointerdown', (e) => {
@@ -287,7 +266,7 @@ car.addEventListener('pointermove', (e) => {
   d.vx += ((e.clientX - d.lx) / dt - d.vx) * 0.4; d.lx = e.clientX; d.lt = now;
   const dx = (e.clientX - d.x0) / (375 / innerWidth || 1);
   if (Math.abs(dx) > 6) d.moved = true;
-  C.pos = d.pos0 - dx / 206;
+  C.pos = d.pos0 - dx / SPREAD;
 });
 const endCarDrag = (e) => {
   const d = C.drag; if (!d) return; C.drag = null;
@@ -301,7 +280,7 @@ const endCarDrag = (e) => {
     return;
   }
   // a flick: the release speed carries it on (≤ 2 cards), it settles on the nearest card with MOVE
-  const vc = -d.vx / 206;
+  const vc = -d.vx / SPREAD;
   const proj = C.pos + vc * 0.16;
   C.to = clamp(Math.round(proj), Math.round(d.pos0) - 2, Math.round(d.pos0) + 2);
   C.v = clamp(vc, -12, 12);
@@ -312,7 +291,7 @@ const spinTo = (to, ms) => new Promise((res) => { C.spin = { from: C.pos, to, t0
 
 // the stage comes in: the navy of the last beat deepens to the stage's black, the glows bloom, the headline
 // rises, the cards sweep in from the right, the controls follow (60 ms stagger)
-const ENTER = () => [$('.st-lede'), $('.st-title'), nameEl, offerEl, peekEl, $('.st-plinth'), grabBtn, usingEl, banEl, $('.st-pill'), $('.st-back')];
+const ENTER = () => [floorEl, pagerEl, $('.st-plinth'), grabBtn, $('.st-back')];
 async function showStage(r, { again = false, fromStory = null } = {}) {
   phase = 'stage';
   const o = window.orbi;
@@ -343,7 +322,6 @@ async function showStage(r, { again = false, fromStory = null } = {}) {
     anim(el, [{ transform: 'translateY(22px)' }, { transform: 'none' }], { duration: MOVE.ms, easing: EASE.move, delay: 60 + i * 40 });
     anim(el, [{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: EASE.in, delay: 60 + i * 40 });
   });
-  usingEl.innerHTML = again ? 'using <b>🪙 1</b> bonus play' : 'using <b>🪙 1</b> free play';
   setTimeout(() => alive(r) && hap('land', 0.5), 260);
   // Orbi settles into the header, where it operates the claw from
   o.stage(ORBI_HOME()); o.gazeAt(-0.3, 0.3); sayBelow = true;
@@ -401,7 +379,6 @@ const cableTo = (Ln, r) => { Q.Lt = Ln; return until(() => settled(Q.L, Q.Lt, Q.
 async function grab(r) {
   phase = 'grab'; grabBtn.disabled = true; grabBtn.classList.remove('is-ready');
   hap('snap');
-  usingEl.innerHTML = '<b>🪙 0</b> plays left — good luck!';
   const o = window.orbi;
   const target = pickSet(); lastPick = target.id;
   const ti = ORDER.indexOf(target);
@@ -415,8 +392,7 @@ async function grab(r) {
   speak(`${target.emoji} ${target.name}! Grabbing it…`);
   const card = cards[ti];
   anim(card, [{ transform: card.style.transform }, { transform: `${card.style.transform} scale(1.06)`, offset: 0.35 }, { transform: card.style.transform }], { duration: 420, easing: EASE.pop });
-  // the headline makes room; Orbi flies over the card
-  [$('.st-title'), $('.st-lede')].forEach((el) => anim(el, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-10px)' }], { duration: 200, easing: EASE.out }));
+  // Orbi flies over the card
   const y0 = L.cy - 132;
   o.stage({ cx: 187.5, cy: y0, unit: 22 });
   await until(() => Math.abs(o.view.cy - y0) < 3 && Math.abs(o.view.cx - 187.5) < 3, r, 900);
@@ -437,7 +413,7 @@ async function grab(r) {
     const m = new DOMMatrix(getComputedStyle(c).transform), side = m.m41 < 0 ? -1 : 1;
     anim(c, [{ transform: c.style.transform, opacity: +c.style.opacity || 1 }, { transform: `${c.style.transform} translate3d(${side * 30}px, 520px, 0) rotateZ(${side * (14 + i * 4)}deg)`, opacity: 0 }], { duration: 620, easing: EASE.fall, delay: i * 25 });
   });
-  [nameEl, offerEl, peekEl, $('.st-plinth'), grabBtn, usingEl, banEl].forEach((el, i) => anim(el, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(26px)' }], { duration: 200, easing: EASE.out, delay: i * 25 }));
+  [floorEl, pagerEl, $('.st-plinth'), grabBtn].forEach((el, i) => anim(el, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(26px)' }], { duration: 200, easing: EASE.out, delay: i * 25 }));
   setTimeout(() => alive(r) && hap('land', 0.4), 420);
   Q.ty = y0 - 26; Q.tx = 187.5 + 18; Q.Lt = Math.max(30, Q.L - 52);
   await wait(240, r); Q.tx = 187.5;
@@ -457,11 +433,11 @@ async function toDiscover(set, card, r) {
   // the flying card: a copy with a back (the next page's title), started exactly where the claw holds it
   const fc = document.createElement('div');
   fc.className = 'tx-card'; fc.style.setProperty('--g', set.grad);
-  fc.innerHTML = `<div class="tx-front">${card.innerHTML}</div><div class="tx-back"><div><b>${set.name}</b><small>ORBI'S PICK OF THE DAY</small></div></div>`;
+  fc.innerHTML = `<div class="tx-front">${card.innerHTML}</div><div class="tx-back"><div><b>${set.name}</b><small>PICK OF THE DAY</small></div></div>`;
   tx.appendChild(fc); tx.style.setProperty('--g', set.grad); tx.classList.add('is-on');
   flood.style.clipPath = `circle(0px at ${cx}px ${cy}px)`;
   const rot0 = -Q.th * 57.2958 + C.tilt;
-  const at = (x, y, sc, ry, rz = 0) => `translate(${(x - 114).toFixed(1)}px, ${(y - 69).toFixed(1)}px) rotateZ(${rz}deg) rotateY(${ry}deg) scale(${sc})`;
+  const at = (x, y, sc, ry, rz = 0) => `translate(${(x - CW / 2).toFixed(1)}px, ${(y - CH / 2).toFixed(1)}px) rotateZ(${rz}deg) rotateY(${ry}deg) scale(${sc})`;
   card.style.visibility = 'hidden';
   // the claw lets go and reels back into Orbi
   Q.opent = 1; Q.Lt = 0; hap('pop');
@@ -534,18 +510,9 @@ async function toPLP(set, r) {
   o.lock(false); o.stage(null); o.gazeAt(null); o.setState('idle'); o.statusInk(null);
   o.goPage(false, { fade: true });
 }
-// the header: back closes the page; "my picks" reopens the last world Orbi grabbed
+// the header: back closes the page
 $('.st-back').addEventListener('pointerdown', () => hap('tap'));
 $('.st-back').addEventListener('click', () => { if (['stage', 'ready'].includes(phase)) window.orbi?.goPage(false); });
-$('.st-pill').addEventListener('click', () => {
-  if (phase !== 'ready') return; hap('tap');
-  if (!lastPick) { speak('Nothing yet — press GRAB and I\'ll win you one! 🎯', { hold: 1800 }); return; }
-  const s = SETS.find((x) => x.id === lastPick);
-  phase = 'tx'; hush();
-  [...cards, ...ENTER()].forEach((el) => anim(el, [{ opacity: 1 }, { opacity: 0 }], { duration: 160, easing: EASE.out }));
-  setTimeout(() => { if (phase !== 'tx') return; C.loop = false; st.classList.remove('is-on'); discoverSet = s; disc.show(s, { fromFlood: false }); phase = 'discover'; window.orbi?.stage({ cx: 322, cy: 96, unit: 24 }); }, 170);
-});
-banEl.addEventListener('click', () => { if (phase === 'ready') { hap('tap'); window.orbi?.hop(1.2); speak('noon One members get 10% extra on my picks 💛', { hold: 2000 }); } });
 
 // ─── lifecycle: the page opens → intro (first time) or straight to the stage; it closes → everything resets
 function reset() {

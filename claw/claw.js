@@ -13,6 +13,7 @@
    and follows you down the discovery page. ══ */
 import { SETS } from './catalog.js';
 import { mountDiscover } from './discover.js';
+import { mountStory } from './story.js';
 
 // ─── who it's for: a 2026 order history (demo data) and what it adds up to ──────────────────────────────
 const USER = { name: 'Saswata' };
@@ -69,7 +70,7 @@ const CLAW_SVG = `<svg viewBox="0 0 64 56" aria-hidden="true">
   <rect x="20" y="2" width="24" height="16" rx="6" fill="#ffd23c"/><rect x="24" y="7" width="16" height="4" rx="2" fill="#7a3e00" opacity=".4"/></svg>`;
 root.innerHTML = `
   <div class="cx-ground"></div>
-  <div class="cx-progress">${'<i></i>'.repeat(5)}</div>
+  <div class="cx-progress">${'<i></i>'.repeat(4)}</div>
   <div class="cx-story" data-no-drag></div>
   <div class="st">
     <div class="st-glow"></div>
@@ -77,9 +78,7 @@ root.innerHTML = `
     <button class="st-pill" type="button"><b>🎁</b><span>my picks</span></button>
     <div class="st-lede">let Orbi grab you<br>a deal from 5 worlds</div>
     <div class="st-title">PICK OF THE DAY</div>
-    <div class="st-car" data-no-drag>${ORDER.map((s, i) => `<div class="st-card" data-i="${i}" style="--g:${s.grad}">
-      <div class="c-brand"><i>${s.emoji}</i>${s.name}</div><div class="c-cap">${s.cap}</div>
-      <div class="c-band"><small style="margin:0 6px 0 0">UP TO</small>${s.best}%<small>OFF</small></div><i class="c-dim"></i></div>`).join('')}</div>
+    <div class="st-car" data-no-drag></div>
     <div class="st-name st-swap"></div>
     <div class="st-offer st-swap"><b></b><span>+</span><i>🎁</i></div>
     <div class="st-peek st-swap"><u></u><span></span></div>
@@ -100,7 +99,7 @@ const $ = (s) => root.querySelector(s);
 const story = $('.cx-story'), progress = [...root.querySelectorAll('.cx-progress i')], skipBtn = $('.cx-skip');
 const say = $('.cx-say'), burst = $('.cx-burst'), confetti = $('.cx-confetti');
 const groundEl = $('.cx-ground');
-const st = $('.st'), car = $('.st-car'), cards = [...root.querySelectorAll('.st-card')];
+const st = $('.st'), car = $('.st-car');
 const nameEl = $('.st-name'), offerEl = $('.st-offer'), peekEl = $('.st-peek'), grabBtn = $('.st-grab'), usingEl = $('.st-using'), banEl = $('.st-ban');
 const cableEl = $('.st-cable'), clawEl = $('.st-claw'), prongs = [...clawEl.querySelectorAll('.pr')];
 const tx = $('.tx'), flood = $('.tx-flood'), rays = $('.tx-rays'), sparks = $('.tx-spark');
@@ -157,83 +156,35 @@ function placeSay() {
   say.style.top = `${clamp(v.cy - h / 2, 50, sheet.clientHeight - h - 10).toFixed(1)}px`;
 }
 
-// ─── 1 · the intro: five beats, ~4.9 s ─────────────────────────────────────────────────────────────────
-const fmt = (n) => n.toLocaleString('en-US');
-const ln = (cls, html) => `<span class="cx-ln ${cls}"><span>${html}</span></span>`;
-// each beat sits on a noon DS surface: brand yellow → inverted navy → white → page grey → inverted navy;
-// type is the DS ramp (H40 ExtraBold, H28 Bold, B16, B12 Bold); the stat colours are DS semantics
-// (brand yellow on navy, success green for "saved")
-const BEATS = [
-  { ms: 700, bg: '#FEEE00', ink: '#0E0E0E', html: () => `${ln('cx-kick', `${USER.name}, your 2026`)}${ln('cx-h1', 'Wrapped by Orbi')}${ln('cx-sub', 'Your year on noon, in five seconds')}` },
-  { ms: 720, bg: '#101628', ink: '#FFFFFF', dark: true, accent: '#FEEE00', html: () => `${ln('cx-kick', 'You placed')}${ln('cx-num', '<span data-count="' + ORDERS + '">0</span>')}${ln('cx-h2', 'orders')}${ln('cx-sub', `That's one every ${EVERY} days 📦`)}`, count: true },
-  { ms: 720, bg: '#FFFFFF', ink: '#1D2539', accent: '#0F8857', html: () => `${ln('cx-kick', 'And saved')}${ln('cx-num', '<small>AED</small><span data-count="' + SAVED + '">0</span>')}${ln('cx-sub', 'on deals, coupons & noon One 🎉')}`, count: true, coins: true },
-  { ms: 800, bg: '#F2F3F7', ink: '#1D2539', html: () => `${ln('cx-kick', 'Your top 3')}<div class="cx-rows">${RANKED.slice(0, 3).map((r, i) => `<div class="cx-row" style="--tint:${r.set.tint}"><i>${i + 1}</i><b>${r.set.emoji}</b><span>${r.set.name}</span><em>${r.n} orders</em></div>`).join('')}</div>`, rows: true },
-  { ms: 880, bg: '#101628', ink: '#FFFFFF', dark: true, accent: '#FEEE00', html: () => `${ln('cx-kick', 'Your shopper vibe')}${ln('cx-h1', `<span style="color:#FEEE00">${VIBE}</span>`)}${ln('cx-sub', 'Orbi has a little prize for you…')}` },
-];
-function countUp(el, to, ms) {
-  const t0 = performance.now();
-  const f = (now) => { const t = clamp((now - t0) / ms, 0, 1), e = 1 - Math.pow(1 - t, 3); el.textContent = fmt(Math.round(to * e)); if (t < 1 && el.isConnected) requestAnimationFrame(f); };
-  requestAnimationFrame(f);
-}
-function riseIn(beat, r) {
-  const lines = [...beat.querySelectorAll('.cx-ln > span, .cx-row')];
-  lines.forEach((el, i) => {
-    const row = el.classList.contains('cx-row');
-    anim(el, [{ transform: row ? 'translateY(20px)' : 'translateY(105%)' }, { transform: 'none' }], { duration: MOVE.ms, easing: EASE.move, delay: i * 60 });
-    anim(el, [{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: EASE.in, delay: i * 60 });
-    if (row) setTimeout(() => alive(r) && hap('tick'), 120 + i * 60);
-  });
-}
-function leave(beat) {
-  const lines = [...beat.querySelectorAll('.cx-ln > span, .cx-row')].reverse();
-  return Promise.all(lines.map((el, i) => anim(el, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-16px)' }], { duration: 150, easing: EASE.out, delay: i * 20 }).finished.catch(() => {})));
-}
-function coinBurst(x, y) {
-  burst.innerHTML = '';
-  for (let i = 0; i < 14; i++) {
-    const c = document.createElement('i'); c.textContent = i % 3 ? '🪙' : '✨'; burst.appendChild(c);
-    const a = -Math.PI / 2 + (Math.random() - 0.5) * 2.2, d = 70 + Math.random() * 90;
-    anim(c, [{ transform: `translate(${x}px, ${y}px) scale(.3)`, opacity: 0 }, { transform: `translate(${x + Math.cos(a) * d * 0.6}px, ${y + Math.sin(a) * d * 0.6}px) scale(1)`, opacity: 1, offset: 0.35 },
-      { transform: `translate(${x + Math.cos(a) * d}px, ${y + Math.sin(a) * d + 60}px) scale(.8)`, opacity: 0 }], { duration: 1100 + Math.random() * 300, easing: 'cubic-bezier(.2,.7,.3,1)' });
-  }
-}
-let beatIdx = -1, beatNext = null;
+// ─── 1 · the story: four Wrapped-style beats (claw/story.js) ───────────────────────────────────────────
+const cardHTML = (s, i) => `<div class="st-card" data-i="${i}" style="--g:${s.grad}">
+      <div class="c-brand"><i>${s.emoji}</i>${s.name}</div><div class="c-cap">${s.cap}</div>
+      <div class="c-band"><small style="margin:0 6px 0 0">UP TO</small>${s.best}%<small>OFF</small></div><i class="c-dim"></i></div>`;
+const storyMod = mountStory({
+  story, progress, anim, EASE, MOVE, hap, reduce,
+  ink: (dark) => { root.style.setProperty('--ink', dark ? '#F1EFE6' : '#0E0E0E'); window.orbi && window.orbi.statusInk(dark ? 1 : null); },
+  layout: () => { layoutStage(); return L; },
+  cardsHTML: () => ORDER.map(cardHTML).join(''),
+  poseOf: (i, pos, s) => poseOf(i, pos, s),
+});
+let storyEnd = null;                                                       // the last beat, left for the stage's reveal
 async function runIntro(r) {
   phase = 'intro';
   const o = window.orbi;
-  o.stage({ cx: 187.5, cy: 150, unit: 36 });
   story.innerHTML = ''; root.classList.add('is-intro');
   skipBtn.style.opacity = '1'; skipBtn.style.pointerEvents = '';
   anim($('.cx-progress'), [{ opacity: 0 }, { opacity: 1 }], { duration: 300, easing: EASE.in });
-  progress.forEach((p) => p.style.setProperty('--f', 0));
-  for (let i = 0; i < BEATS.length; i++) {
-    if (!alive(r)) throw new Error('stale');
-    beatIdx = i;
-    const b = BEATS[i];
-    ground(b.bg, b.ink, b.dark);
-    const el = document.createElement('div');
-    el.className = 'cx-beat is-on'; el.style.setProperty('--ink', b.ink); if (b.accent) el.style.setProperty('--accent', b.accent);
-    el.style.setProperty('--top', `${Math.max(214, sheet.clientHeight * 0.3)}px`);
-    el.innerHTML = b.html(); story.appendChild(el);
-    riseIn(el, r);
-    hap('tick');
-    if (b.count) el.querySelectorAll('[data-count]').forEach((c) => countUp(c, +c.dataset.count, 560));
-    if (b.coins) setTimeout(() => { if (!alive(r)) return; const q = el.querySelector('.cx-num > span').getBoundingClientRect(), s = sheet.getBoundingClientRect(); coinBurst(q.right - s.left + 18, q.top - s.top + 20); hap('pop'); o.hop(1.4); }, 460);
-    if (i === 1) setTimeout(() => alive(r) && (o.hop(1.2), hap('pop')), 560);
-    o.gazeAt(i === 3 ? -0.18 : -0.12, i === 3 ? 0.34 : 0.26);                         // reading along with you
-    if (i === 4) { o.setState('working'); }
-    // the beat holds (tap = next), its segment fills
-    const seg = progress[i];
-    const fill = anim(seg, [{ '--f': 0 }, { '--f': 1 }], { duration: reduce.matches ? 300 : b.ms, easing: 'linear' });
-    await new Promise((res) => { beatNext = res; fill.finished.then(res, res); });
-    seg.style.setProperty('--f', 1); fill.cancel?.();
-    if (!alive(r)) throw new Error('stale');
-    await leave(el); el.remove();
-  }
+  // (the numerals' face: wait for it briefly so nothing reflows mid-beat)
+  try { await Promise.race([document.fonts.load('900 100px Unbounded'), new Promise((res) => setTimeout(res, 900))]); } catch {}
+  if (!alive(r)) throw new Error('stale');
+  // Orbi watches from the top corner (under Skip), hops on the big numbers, then works the stack in the last beat
+  o.stage({ cx: 336, cy: 124, unit: 16 }); o.gazeAt(-0.35, 0.15);
+  storyEnd = await storyMod.run(r, alive, o, { USER, ORDERS, SAVED, EVERY });
 }
-story.addEventListener('click', () => { if (phase === 'intro' && beatNext) { const f = beatNext; beatNext = null; f(); } });
 
 // ─── 2 · the stage: "Pick of the day" ──────────────────────────────────────────────────────────────────
+car.innerHTML = ORDER.map(cardHTML).join('');
+const cards = [...car.querySelectorAll('.st-card')];
 const L = { H: 0, cy: 0, k: 1, ban: true };
 const ORBI_HOME = () => ({ cx: 322, cy: L.lede + lerp(22, 24, L.k), unit: 22 });       // where the reference has its round button
 function layoutStage() {
@@ -247,20 +198,31 @@ function layoutStage() {
 }
 
 // the carousel: `pos` is a float card index; every card is placed from its offset to it (a coverflow)
-const C = { pos: 0, v: 0, to: 0, drag: null, spin: null, focus: -1, frozen: false, loop: false, last: 0 };
+const C = { pos: 0, v: 0, to: 0, drag: null, spin: null, focus: -1, frozen: false, loop: false, last: 0, sp: { x: 1, v: 0 } };
+// a card's pose for carousel position `pos`; `s` spreads it from the story's stack (0: stacked, slightly fanned,
+// at .62 scale, where claw/story.js draws it) to the coverflow (1)
+const STACK_RZ = [0, -7, 5, -3, 8];
+function poseOf(i, pos, s = 1) {
+  let d = i - pos; d = ((d % N) + N + N / 2) % N - N / 2;              // −2.5 … 2.5
+  const ad = Math.abs(d), s1 = Math.min(ad, 1);
+  const x = Math.sign(d) * (ad <= 1 ? ad * 206 : 206 + (ad - 1) * 96);
+  const rot = clamp(d, -1, 1) * 42, z = -s1 * 80 - Math.max(0, ad - 1) * 60, sc = 1 - s1 * 0.12;
+  const op = ad > 1.5 ? Math.max(0, 1 - (ad - 1.5) * 2.4) : 1;
+  return {
+    transform: `translate3d(${(x * s).toFixed(2)}px, 0, ${(z * s).toFixed(1)}px) rotateZ(${((1 - s) * STACK_RZ[i]).toFixed(2)}deg) rotateY(${(rot * s).toFixed(2)}deg) scale(${lerp(0.62, sc, s).toFixed(4)})`,
+    opacity: lerp(1, op, clamp(s * 1.6 - 0.3, 0, 1)), dim: s1 * 0.38 * s, z: 10 - Math.round(ad * 2), sheen: d * 70 * s,
+  };
+}
 function placeCards() {
   cards.forEach((el, i) => {
     if (C.frozen && el !== C.carriedEl) return;
     if (el === C.carriedEl) return;
-    let d = i - C.pos; d = ((d % N) + N + N / 2) % N - N / 2;           // −2.5 … 2.5
-    const ad = Math.abs(d), s1 = Math.min(ad, 1);
-    const x = Math.sign(d) * (ad <= 1 ? ad * 206 : 206 + (ad - 1) * 96);
-    const rot = clamp(d, -1, 1) * 42, z = -s1 * 80 - Math.max(0, ad - 1) * 60, sc = 1 - s1 * 0.12;
-    el.style.transform = `translate3d(${x.toFixed(2)}px, 0, ${z.toFixed(1)}px) rotateY(${rot.toFixed(2)}deg) scale(${sc.toFixed(4)})`;
-    el.style.opacity = ad > 1.5 ? Math.max(0, 1 - (ad - 1.5) * 2.4).toFixed(3) : '1';
-    (el._dim || (el._dim = el.querySelector('.c-dim'))).style.opacity = (s1 * 0.38).toFixed(3);   // (an overlay, not a filter: compositor-only)
-    el.style.zIndex = String(10 - Math.round(ad * 2));
-    el.style.setProperty('--sheen', `${(d * 70).toFixed(1)}%`);
+    const p = poseOf(i, C.pos, C.sp.x);
+    el.style.transform = p.transform;
+    el.style.opacity = p.opacity.toFixed(3);
+    (el._dim || (el._dim = el.querySelector('.c-dim'))).style.opacity = p.dim.toFixed(3);   // (an overlay, not a filter: compositor-only)
+    el.style.zIndex = String(p.z);
+    el.style.setProperty('--sheen', `${p.sheen.toFixed(1)}%`);
   });
 }
 function stepCarousel(dt) {
@@ -274,6 +236,10 @@ function stepCarousel(dt) {
       const h = Math.min(left, 1 / 240);
       C.v += (MOVE.w ** 2 * (C.to - C.pos) - 2 * MOVE.z * MOVE.w * C.v) * h; C.pos += C.v * h;
     }
+  }
+  if (C.sp.x !== 1) {                                                        // the stack spreading into the carousel (MOVE)
+    for (let left = dt; left > 1e-6; left -= 1 / 240) { const h = Math.min(left, 1 / 240); C.sp.v += (MOVE.w ** 2 * (1 - C.sp.x) - 2 * MOVE.z * MOVE.w * C.sp.v) * h; C.sp.x += C.sp.v * h; }
+    if (Math.abs(1 - C.sp.x) < 0.0015 && Math.abs(C.sp.v) < 0.02) { C.sp.x = 1; C.sp.v = 0; }
   }
   const f = wrap(Math.round(C.pos));
   if (f !== C.focus) {
@@ -350,7 +316,7 @@ const spinTo = (to, ms) => new Promise((res) => { C.spin = { from: C.pos, to, t0
 // the stage comes in: the navy of the last beat deepens to the stage's black, the glows bloom, the headline
 // rises, the cards sweep in from the right, the controls follow (60 ms stagger)
 const ENTER = () => [$('.st-lede'), $('.st-title'), nameEl, offerEl, peekEl, $('.st-plinth'), grabBtn, usingEl, banEl, $('.st-pill'), $('.st-back')];
-async function showStage(r, { again = false } = {}) {
+async function showStage(r, { again = false, fromStory = null } = {}) {
   phase = 'stage';
   const o = window.orbi;
   root.classList.remove('is-intro'); sheet.classList.add('cx-dark');
@@ -362,8 +328,19 @@ async function showStage(r, { again = false } = {}) {
   st.getAnimations({ subtree: true }).forEach((a) => a.cancel());
   Object.assign(C, { frozen: false, carriedEl: null, drag: null, spin: null, v: 0, focus: -1 });
   cards.forEach((c) => { c.style.transformOrigin = ''; c.style.visibility = ''; });
-  if (!again) { C.pos = -2.6; C.to = 0; }                                // (the sweep: the cards glide in on MOVE)
+  C.sp = { x: 1, v: 0 };
+  if (fromStory) { C.pos = 0; C.to = 0; C.sp = { x: 0, v: 0 }; }          // (the story's stack spreads into the carousel)
+  else if (!again) { C.pos = -2.6; C.to = 0; }                           // (the sweep: the cards glide in on MOVE)
   else { C.to = Math.round(C.pos); C.pos = C.to - 1.4; }
+  if (fromStory) {
+    // the stage takes over the last beat in place: the same black, the same cards in the same pose; the beat's
+    // words go and its radar blooms out under the stage (see-through until the beat is gone)
+    st.style.background = 'transparent';
+    storyMod.leave(fromStory);
+    const end = fromStory;
+    setTimeout(() => { end.remove(); st.style.background = ''; }, 620);
+    hap('snap');
+  }
   st.classList.add('is-on');
   C.loop = true; C.last = 0; requestAnimationFrame(stageTick);
   anim($('.st-glow'), [{ opacity: 0 }, { opacity: 1 }], { duration: 400, easing: EASE.out });
@@ -598,7 +575,7 @@ async function start() {
   if (!o) return;
   try {
     const again = played;
-    if (!played) { await runIntro(r); if (!alive(r)) return; played = true; }
+    if (!played) { await runIntro(r); if (!alive(r)) return; played = true; await showStage(r, { fromStory: storyEnd }); storyEnd = null; return; }
     await showStage(r, { again });
   } catch {}
 }

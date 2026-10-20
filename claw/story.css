@@ -1,0 +1,68 @@
+/* ══ Orbi's Claw — the story beats (claw/story.js), after the Spotify Wrapped 2025 reference: paper #F1EFE6 and
+   ink #0E0E0E, op-art rings and dot grids, huge extended numerals (Unbounded 900) in noon yellow with an ink
+   outline, hand-drawn lines; noon type (Noontree) for the words. ══ */
+.ws { position: absolute; inset: 0; overflow: hidden; background: #F1EFE6; color: #0E0E0E; will-change: transform; contain: layout paint; }
+.ws.dark { background: #0E0E0E; color: #F1EFE6; }
+.ws-curating.dark { background: #050506; }
+.ws-copy { position: absolute; left: 24px; right: 24px; top: 40%; text-align: center; z-index: 1; }
+.ws-h { font: 800 30px/35px var(--noon); letter-spacing: -0.02em; }
+.ws-h2 { font: 700 20px/26px var(--noon); letter-spacing: -0.01em; }
+.ws-s { margin-top: 8px; font: 500 14px/20px var(--noon); opacity: .72; }
+.ws-line { position: absolute; left: 0; top: 12%; width: 100%; height: 140px; pointer-events: none; z-index: 2; }
+.ws-line path { fill: none; stroke-width: 2; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; }
+/* numerals: extended, black weight, yellow with an ink outline */
+.ws-year, .ws-num b, .ws-band b, .ws-track span { font-family: 'Unbounded', 'Noontree', system-ui, sans-serif; font-weight: 900; color: #FEEE00;
+  -webkit-text-stroke: 4px #0E0E0E; paint-order: stroke fill; letter-spacing: -0.05em; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* 0 · open */
+.ws-half { position: absolute; left: 0; right: 0; height: 50%; overflow: hidden; background: #F1EFE6; z-index: 3; will-change: transform; }
+.ws-half.t { top: 0; } .ws-half.b { bottom: 0; }
+.ws-rings { position: absolute; left: 50%; width: 1100px; height: 1100px; margin-left: -550px; will-change: rotate, scale; }
+.ws-half.t .ws-rings { top: calc(100% - 550px); } .ws-half.b .ws-rings { top: -550px; }
+.ws-rings svg, .ws-corner svg { display: block; width: 100%; height: 100%; }
+.ws-year { position: absolute; left: 0; right: 0; top: 50%; margin-top: -142px; z-index: 4; text-align: center; font-size: 150px; line-height: 142px; }
+.ws-year span { display: block; }
+.ws-open .ws-copy { top: 36%; }
+.ws-band { position: absolute; left: 0; right: 0; bottom: 0; height: 26%; overflow: hidden; transform: translateY(100%);
+  background: repeating-linear-gradient(90deg, #0E0E0E 0 14px, #F1EFE6 14px 28px); border-top: 3px solid #0E0E0E; }
+.ws-btrack { position: absolute; left: 0; top: 50%; margin-top: -92px; display: flex; width: max-content; will-change: transform; }
+.ws-band b { flex: none; padding-right: 28px; font-size: 176px; line-height: 184px; }
+
+/* 1 · orders */
+.ws-corner { position: absolute; left: -230px; bottom: -290px; width: 540px; height: 540px; will-change: rotate, scale; }
+.ws-orders .ws-copy { top: 38%; }
+.ws-num { position: absolute; left: 0; right: 0; top: 30%; text-align: center; pointer-events: none; }
+.ws-num b { display: inline-block; font-size: 210px; line-height: 220px; transform: translateX(-140%); text-shadow: 8px 8px 0 #5E5600; }
+.ws-cap { position: absolute; left: 24px; right: 24px; top: calc(30% + 228px); text-align: center; z-index: 2; }
+.ws-cap > *, .ws-kick, .ws-marq { opacity: 0; }
+
+/* 2 · saved */
+.ws-dots { position: absolute; left: -24px; right: -24px; }
+.ws-dots.t { top: 96px; } .ws-dots.b { bottom: 26px; }
+.ws-row { display: flex; justify-content: space-between; align-items: center; height: 56px; }
+.ws-row.o { transform: translateX(28px); }
+.ws-row i { display: block; width: 34px; height: 34px; border-radius: 50%; background: #0E0E0E; box-shadow: inset 0 0 0 2px #0E0E0E; will-change: transform; }
+.ws-saved .ws-copy { top: 41%; }
+.ws-kick { position: absolute; left: 0; right: 0; top: 34%; text-align: center; font: 800 26px/30px var(--noon); letter-spacing: -0.02em; }
+.ws-marq { position: absolute; left: 0; right: 0; top: calc(34% + 40px); height: 124px; overflow: hidden; }
+.ws-track { display: flex; width: max-content; will-change: transform; }
+.ws-track span { flex: none; padding-right: 34px; font-size: 92px; line-height: 124px; -webkit-text-stroke-width: 3px; }
+.ws-track em { font-style: normal; }
+.ws-cap.s { top: calc(34% + 172px); }
+
+/* 3 · curating */
+.ws-radar { position: absolute; left: 50%; top: calc(var(--cy, 284px) + 69px); width: 0; height: 0; }
+.ws-radar i { position: absolute; left: -190px; top: -190px; width: 380px; height: 380px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px rgba(241, 239, 230, .5); opacity: 0; will-change: transform, opacity; }
+.ws-copy.c { top: 150px; }
+.ws-ell i { font-style: normal; display: inline-block; animation: ws-ell 1.1s ease-in-out infinite; }
+.ws-ell i:nth-child(2) { animation-delay: .15s; } .ws-ell i:nth-child(3) { animation-delay: .3s; }
+@keyframes ws-ell { 0%, 60%, 100% { opacity: .25; transform: none; } 30% { opacity: 1; transform: translateY(-4px); } }
+.ws-stack { position: absolute; left: 0; right: 0; top: var(--cy, 284px); height: 150px; perspective: 760px; z-index: 2; }
+.ws-cap.c { top: 470px; }
+
+@media (prefers-reduced-motion: reduce) { .ws-ell i { animation: none; opacity: 1; } }
+/* short screens (≤ 760 tall): one less dot row on top, the corner rings lower, so the words keep clear */
+@media (max-height: 760px) {
+  .ws-dots.t .ws-row:nth-child(3) { display: none; }
+  .ws-corner { bottom: -350px; }
+}

@@ -447,7 +447,7 @@ async function toDiscover(set, card, r) {
   sparkBurst(ex, ey, r);
   setTimeout(() => alive(r) && hap('snap'), 420);
   Q.follow = false;
-  o.stage({ cx: 334, cy: 520, unit: 19 }); o.gazeAt(-0.2, 0.25);
+  o.stage({ cx: 338, cy: 74, unit: 15 }); o.gazeAt(-0.2, 0.25);          // (top right of the offers page header)
   setTimeout(() => alive(r) && o.hop(2), 380);
   await done(fly, r);
   await done(fl, r).catch(() => {});

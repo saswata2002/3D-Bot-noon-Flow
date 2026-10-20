@@ -1,145 +1,161 @@
-/* ══ Orbi's Claw — the discovery page ════════════════════════════════════════════════════════════════════
-   Where a grabbed card lands: not a PLP but a page made around that one set — a hero in the card's colour
-   (its flip side becomes this hero), Orbi's #1 pick on a glowing plinth (drag to turn it), a snap-swiped deck
-   of tall cards, coupons, a "steals" grid, and a finale that hands you back to the claw or out to noon's PLP.
-   Orbi stays on the page: in the hero first, then in the corner, with a line for each section as it arrives.
-   Motion: the noon standard — sections rise on the MOVE spring with a 60 ms stagger and fade in out-cubic
-   200 ms; the hero parallaxes; the top bar fades in once the hero has scrolled away. ══ */
+/* ══ Orbi's Claw — the discovery page, 1:1 with Figma Sas-Motion 306:49099 "noon Offers — Full page" ═════════
+   Where a grabbed coupon lands: "Offers for you", built for the world the claw picked —
+     01 Perfect deal pick for you — the hero card: ETA strip, media with rank tag / discount / wishlist, brand ·
+        rating · reviews · express, title, and a swipe-to-buy rail with the total
+     02 More deals that you might like — a centre-focus carousel of deal cards (the world's picks)
+     04 Want to try something similar to your usuals? — a neighbouring category
+     05 Brands you love, just in a fresh new deal — brand cards with a line item and Add to cart
+     06 Want to keep it light? — small treats under AED 99, three round picks
+     07 Trending deals near you — full-bleed trend cards
+   Data: claw/offers.js (real noon.com UAE products scraped from noon search) + the world's own picks
+   (claw/catalog.js). Motion: the noon standard — sections rise on MOVE with a 60 ms stagger as they scroll in;
+   rewards (add to cart, wishlist, swipe to buy) pop on the ζ .55 spring. ══ */
+import { OFFERS } from './offers.js';
 
-import { cardArt, cardVars } from './card.js';
-
-const pct = (p) => (p.was ? Math.round((1 - p.price / p.was) * 100) : 0);
-const aed = (n) => (Math.round(n * 100) / 100).toLocaleString('en-US', { maximumFractionDigits: n % 1 ? 2 : 0 });
-const short = (t, n = 56) => (t.length > n ? `${t.slice(0, n).replace(/\s+\S*$/, '')}…` : t);
-const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-
-// each set's story: the hero line, Orbi's lines per section, its coupons
-const STORY = {
-  gym: { cap: 'Gym essentials', lede: 'Lift heavier, stretch deeper — the gear you keep coming back for, picked for you.', spot: 'My #1 pick for your gains 💪 Drag to spin it', code: 'LIFT' },
-  tech: { cap: 'Audio & wearables', lede: 'Earbuds, watches and the small things that make every day sound better.', spot: 'This one\'s a crowd favourite 🎧 Drag to spin it', code: 'TECH' },
-  scents: { cap: 'Perfumes', lede: 'Signature scents for every mood — from the office to a night out.', spot: 'Smells like a 5-star review ✨ Drag to spin it', code: 'SCENT' },
-  glow: { cap: 'Skincare', lede: 'Serums, sunscreens and the glow-up kit worth putting in your bag.', spot: 'Your skin will thank you 💖 Drag to spin it', code: 'GLOW' },
-  home: { cap: 'Kitchen appliances', lede: 'The upgrades that make home feel like a five-star kitchen.', spot: 'Chef\'s kiss 👨‍🍳 Drag to spin it', code: 'HOME' },
+const I = 'claw/art/op/';
+const D = '';                                   // Noontree's dirham glyph
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const money = (n) => (n == null ? '' : Number(n).toLocaleString('en-US', { maximumFractionDigits: n % 1 ? 2 : 0 }));
+const kfmt = (c) => (c == null || c === '' ? '' : typeof c === 'number' ? (c >= 1000 ? `${(c / 1000).toFixed(1).replace(/\.0$/, '')}K` : String(c)) : String(c));
+const off = (p) => p.off || (p.was ? Math.round((1 - p.price / p.was) * 100) : 0);
+const shortName = (t, b, n = 30) => {
+  let s = t.toLowerCase().startsWith(String(b).toLowerCase()) ? t.slice(b.length) : t;
+  s = s.replace(/^[\s,:-]+/, '').split(/\s[-–|]\s|,|\(|\[/)[0].trim();
+  if (s.length > n) s = s.slice(0, n).replace(/\s+\S*$/, '');
+  return s.replace(/\s+(and|with|for|by|of|&|-|in)$/i, '');
 };
-const LINES = { deck: 'Swipe through — tap + to add 👉', tix: 'Coupons! Tap one to copy 🎟️', grid: 'Small prices, big vibes', end: 'Fancy another go? 🎰' };
+// the world's own picks (catalog.js) as deal cards
+const fromCatalog = (p) => ({ brand: p.brand, name: shortName(p.title, p.brand), rating: p.rating, count: p.ratingCount, price: p.price, was: p.was, off: off(p), meta: p.tag, img: p.img });
+const HEAD = { tech: 'Headphones', gym: 'Sneakers', scents: 'Fragrance', glow: 'Face Serums', home: 'Blenders' };
+const SIM_LINE = { tech: 'Explore bluetooth speakers', gym: 'Explore fitness trackers', scents: 'Explore bakhoor', glow: 'Explore hair serums', home: 'Explore electric kettles' };
+
+const rating = (r, c) => (r ? `<span class="op-rt"><img src="${I}star.svg" alt=""><b>${r}</b></span>${c ? `<span class="op-ct">(${esc(kfmt(c))})</span>` : ''}` : '');
+const heart = (cls = '') => `<button class="op-wish ${cls}" type="button" aria-label="Wishlist"><img src="${I}heart16.svg" alt=""><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14s-5.6-3.4-5.6-7.3C2.4 4.6 4 3 5.9 3 7 3 7.7 3.6 8 4.2 8.3 3.6 9 3 10.1 3 12 3 13.6 4.6 13.6 6.7 13.6 10.6 8 14 8 14z"/></svg></button>`;
+const addBtn = () => `<button class="op-add" type="button"><span>ADD</span><img src="${I}plus.svg" alt=""></button>`;
+const title = (pre, mark) => `<div class="op-title">${pre ? `<p>${esc(pre)}</p>` : ''}<span class="op-mark"><i></i>${esc(mark)}</span></div>`;
+
+function dealCard(p, i) {
+  return `<div class="op-deal" data-i="${i}"><div class="op-media">${p.img ? `<img class="op-img" src="${p.img}" alt="" decoding="async" loading="lazy">` : ''}
+      ${off(p) >= 5 ? `<span class="op-off">${off(p)}% OFF</span>` : ''}${heart()}${p.rank ? `<span class="op-rank s">${esc(p.rank)}</span>` : ''}</div>
+    <div class="op-body"><div class="op-brow"><span class="op-brand">${esc(p.brand)}</span><img class="op-exp" src="${I}express.svg" alt="express"></div>
+      <p class="op-name">${esc(p.name)}</p>
+      <div class="op-meta">${rating(p.rating, p.count)}${p.meta ? `<span class="op-dot">·</span><span class="op-var">${esc(p.meta)}</span>` : ''}</div>
+      <div class="op-pa"><div class="op-price"><b>${D}${money(p.price)}</b>${p.was ? `<s>${money(p.was)}</s>` : ''}</div>${addBtn()}</div></div></div>`;
+}
+function brandCard(p, i) {
+  const eta = p.eta ? 'Get it today' : 'Get it tomorrow';
+  return `<div class="op-bc" data-i="${i}"><div class="op-bm"><img class="op-img" src="${p.img}" alt="" decoding="async" loading="lazy"></div>
+    <div class="op-bb"><p class="op-bn">${esc(p.brand)}</p><p class="op-eta"><img src="${I}clock.svg" alt="">${eta}</p></div><i class="op-div"></i>
+    <div class="op-bi"><p class="op-li"><img src="${I}fbn.svg" alt=""><span>1 x ${esc(p.name)}</span></p>
+      <div class="op-bpa"><div class="op-price m"><b>${D}${money(p.price)}</b>${p.was ? `<s>${money(p.was)}</s>` : ''}</div>
+        <button class="op-atc" type="button"><span>Add to cart</span><img src="${I}chev-bold-blue.svg" alt=""></button></div>
+      <p class="op-best">Best offer applied</p></div></div>`;
+}
+function trendCard(p, i) {
+  const nudge = off(p) >= 30 ? 'Lowest price in a year' : '';
+  return `<div class="op-tc" data-i="${i}"><i class="op-tint"></i><img class="op-timg" src="${p.img}" alt="" decoding="async" loading="lazy"><i class="op-fade"></i>
+    ${off(p) >= 5 ? `<span class="op-off t">${off(p)}% OFF</span>` : ''}${heart('t')}
+    <div class="op-tb">${nudge ? `<span class="op-nudge"><img src="${I}discount.svg" alt="">${nudge}</span>` : ''}
+      <div class="op-trow"><b>${esc(p.name)}</b><b>${D}${money(p.price)}</b></div>
+      <div class="op-tsub"><span>${esc(p.brand)}${p.rank ? ` · ${esc(p.rank.replace(/^#\d+ in /, ''))}` : ''}</span>${p.was ? `<s>${money(p.was)}</s>` : ''}</div>
+      <div class="op-tpa"><div class="op-meta">${rating(p.rating, p.count)}<img class="op-exp" src="${I}express.svg" alt="express"></div>${addBtn()}</div></div></div>`;
+}
 
 export function mountDiscover(ctx) {
-  const { root, sheet, anim, EASE, MOVE, hap, speak, reduce } = ctx;
+  const { root, anim, EASE, MOVE, hap } = ctx;
   const dv = document.createElement('div');
-  dv.className = 'dv';
-  dv.innerHTML = `<div class="dv-scroll" data-no-drag></div><div class="dv-bar"><span></span></div>
-    <button class="dv-back" type="button" aria-label="Back to the claw"><svg viewBox="0 0 22 16" aria-hidden="true"><path d="M21 8H1.5M8 1L1 8l7 7"/></svg></button>`;
+  dv.className = 'dv op';
+  dv.innerHTML = `<div class="dv-scroll" data-no-drag></div>
+    <div class="op-head"><button class="dv-back op-back" type="button" aria-label="Back"><img src="claw/art/lp/back.svg" width="20" height="20" alt=""></button><span>Offers for you</span></div>`;
   root.appendChild(dv);
-  const scroller = dv.querySelector('.dv-scroll'), bar = dv.querySelector('.dv-bar'), back = dv.querySelector('.dv-back');
-  let set = null, io = null, timerT = 0, on = false, corner = null, said = new Set(), heroIn = null;
+  const scroller = dv.querySelector('.dv-scroll'), head = dv.querySelector('.op-head'), back = dv.querySelector('.op-back');
+  let io = null, on = false;
 
   function build(s) {
-    const st = STORY[s.id], ps = [...s.products];
-    const spot = ps.slice().sort((a, b) => (pct(b) * 0.7 + (b.rating || 4) * 10) - (pct(a) * 0.7 + (a.rating || 4) * 10))[0];
-    const rest = ps.filter((p) => p !== spot);
-    const cap = [100, 150, 200, 300, 500].find((n) => ps.filter((p) => p.price < n).length >= 4) || 500;
-    const steals = ps.filter((p) => p.price < cap).sort((a, b) => a.price - b.price).slice(0, 4);
-    const best = Math.max(...ps.map(pct));
-    const tile = (p) => `<div class="dv-tile" data-sku="${p.sku}"><div class="t-img">${p.tag ? `<span class="t-tag">${esc(p.tag)}</span>` : ''}<img src="${p.img}" alt="" decoding="async" loading="lazy"></div>
-      <div class="t-in"><div class="t-brand">${esc(p.brand)}</div><div class="t-ttl">${esc(short(p.title))}</div>
-      <div class="t-row"><b><small>AED</small>${aed(p.price)}</b>${pct(p) >= 5 ? `<u>-${pct(p)}%</u>` : `<u>★ ${p.rating || '4.5'}</u>`}<button class="dv-q" type="button" aria-label="Add to cart">+</button></div></div></div>`;
-    scroller.innerHTML = `
-      <div class="dv-hero" style="${cardVars(s)}"><div class="dv-art">${cardArt(s)}</div></div>
-      <div class="dv-intro h-in">
-        <div class="dv-cap">🏆 PICK OF THE DAY · ${esc(st.cap.toUpperCase())}</div>
-        <div class="dv-lede">${esc(st.lede)}</div>
-        <div class="dv-timer"><i></i><span>Deal ends in <b class="dv-clock">--:--:--</b></span></div>
-      </div>
-      <div class="dv-sec dv-rv" data-say="spot">
-        <div class="dv-spot"><span class="s-tag">🏆 TOP PICK</span>${pct(spot) >= 5 ? `<span class="s-off">-${pct(spot)}%</span>` : ''}
-          <div class="s-stage"><div class="s-disc"></div><div class="s-img"><img src="${spot.img}" alt="" decoding="async"></div></div>
-          <div class="s-meta"><b>${esc(short(spot.title, 80))}</b><span><small style="font-size:13px;font-weight:600">AED</small> ${aed(spot.price)}${spot.was && spot.was > spot.price ? `<s>AED ${aed(spot.was)}</s><em>-${pct(spot)}%</em>` : ''}</span></div>
-          <button class="dv-add" type="button"><span>Add to cart</span></button></div></div>
-      <div class="dv-sec dv-rv" data-say="deck"><h3>${rest.length} more picks <em>swipe →</em></h3><div class="dv-deck">${rest.map(tile).join('')}</div></div>
-      <div class="dv-sec dv-rv" data-say="tix"><h3>Unlocked for you <em>${best}% max</em></h3><div class="dv-tix">
-        ${[[`${Math.min(15, Math.max(10, Math.round(best / 6)))}%`, `${st.code}10`, `Extra off today's picks`, 'Min. spend AED 150 · today only'],
-           ['AED 25', 'NOONONE', 'noon One members', 'On orders over AED 200'],
-           ['FREE', 'SHIPFREE', 'Free express delivery', `On everything in ${s.name}`]]
-          .map(([l, c, b, t]) => `<div class="dv-tik"><div class="k-l">${l}</div><div class="k-r"><b>${esc(b)}</b><span>${esc(t)}</span></div><button class="k-copy" type="button" data-code="${c}">${c}</button></div>`).join('')}
-      </div></div>
-      <div class="dv-sec dv-rv" data-say="grid"><h3>Steals under AED ${cap} <em>${steals.length} picks</em></h3><div class="dv-grid">${steals.map(tile).join('')}</div></div>
-      <div class="dv-end dv-rv" data-say="end"><b>Not quite your vibe?</b><span>Four more worlds are waiting in the machine.</span>
-        <button class="dv-again" type="button">Grab again</button>
-        <button class="dv-all" type="button">Explore all ${esc(st.cap.toLowerCase())} on noon →</button></div>
-      <div class="dv-pad"></div>`;
-    dv.style.setProperty('--g', s.grad); dv.style.setProperty('--a', s.glow);
-    bar.querySelector('span').textContent = s.name;
-    // the spotlight: drag to turn the product; it eases back to a slow idle sway
-    const spotEl = scroller.querySelector('.dv-spot'), img = spotEl.querySelector('.s-img');
-    const tilt = { a: 0, v: 0, drag: null, t0: performance.now() };
-    spotEl.addEventListener('pointerdown', (e) => { if (e.target.closest('button')) return; tilt.drag = { x: e.clientX, a: tilt.a, lx: e.clientX, lt: performance.now() }; });
-    spotEl.addEventListener('pointermove', (e) => {
-      const d = tilt.drag; if (!d) return;
-      const now = performance.now(); tilt.v = (e.clientX - d.lx) / Math.max(1, now - d.lt) * 1000 * 0.25; d.lx = e.clientX; d.lt = now;
-      const na = Math.max(-58, Math.min(58, d.a + (e.clientX - d.x) * 0.35));
-      if (Math.abs(na) >= 58 && Math.abs(tilt.a) < 58) hap('edge');
-      tilt.a = na;
-    });
-    const endTilt = () => { tilt.drag = null; };
-    ['pointerup', 'pointercancel', 'pointerleave'].forEach((ev) => spotEl.addEventListener(ev, endTilt));
-    const turn = (now) => {
-      if (!on) return;
-      if (!tilt.drag) { const h = 1 / 60; const sway = reduce.matches ? 0 : Math.sin((now - tilt.t0) / 1400) * 9; tilt.v += (16.75 ** 2 * (sway - tilt.a) - 2 * 0.81 * 16.75 * tilt.v) * h; tilt.a += tilt.v * h; }
-      img.style.transform = `rotateY(${tilt.a.toFixed(2)}deg) translateY(${(Math.sin((now - tilt.t0) / 900) * (reduce.matches ? 0 : 4)).toFixed(2)}px)`;
-      requestAnimationFrame(turn);
-    };
-    requestAnimationFrame(turn);
-    // add to cart → a morph to "Added", Orbi cheers
-    const add = spotEl.querySelector('.dv-add');
-    add.addEventListener('click', () => {
-      const added = add.classList.toggle('is-added');
-      add.querySelector('span').textContent = added ? '✓ Added to cart' : 'Add to cart';
-      hap(added ? 'success' : 'tap');
-      anim(add, [{ transform: 'scale(.96)' }, { transform: 'scale(1)' }], { duration: 420, easing: EASE.pop });
-      if (added) { window.orbi?.hop(1.8); speak('Great pick! It\'s in your cart 🛒', { hold: 1800 }); }
-    });
-    scroller.querySelectorAll('.dv-q').forEach((q) => q.addEventListener('click', () => {
-      const added = q.classList.toggle('is-added'); q.textContent = added ? '✓' : '+';
-      hap(added ? 'pop' : 'tap');
-      anim(q, [{ transform: 'scale(.7)' }, { transform: 'scale(1)' }], { duration: 420, easing: EASE.pop });
+    const o = OFFERS[s.id], h = o.hero;
+    const deals = s.products.filter((p) => p.was).map(fromCatalog).slice(0, 6);
+    scroller.innerHTML = `<i class="op-glow"></i>
+      <section class="op-sec op-hero-sec">${title('', 'Perfect deal pick for you')}
+        <div class="op-hero">
+          <div class="op-strip"><img src="${I}flash.svg" alt=""><b>${esc(h.eta || 'Get it in 1 hr 14 mins')}</b><i></i><span>Home · Marina Gate 1, Dubai Marina</span></div>
+          <div class="op-hmedia"><img class="op-img" src="${h.img}" alt="" decoding="async">
+            <span class="op-rank">${esc(h.rank ? h.rank.replace(/ & .*$/, '') : `#1 in ${HEAD[s.id]}`)}</span>${off(h) >= 5 ? `<span class="op-off h">${off(h)}% OFF</span>` : ''}${heart('h')}</div>
+          <div class="op-info"><div class="op-brow"><span class="op-brand l">${esc(h.brand)}</span>${rating(h.rating, h.count)}<img class="op-exp t" src="${I}express-today.svg" alt="express today"></div>
+            <p class="op-htitle">${esc(h.name)}</p></div>
+          <div class="op-swipe"><div class="op-knob"><b>SWIPE TO BUY</b><img src="${I}chev-bold.svg" alt=""></div>
+            <div class="op-hint"><img src="${I}hint1.svg" alt=""><img src="${I}hint2.svg" alt=""><img src="${I}hint3.svg" alt=""></div>
+            <div class="op-total"><p><span>Total</span><b>${D}${money(h.price)}</b>${h.was ? `<s>${money(h.was)}</s>` : ''}</p><em>(with offers)</em></div>
+            <div class="op-done">✓ Added to cart</div></div>
+        </div></section>
+      <section class="op-sec op-rv"><i class="op-hair"></i>${title('More deals', 'that you might like')}
+        <div class="op-car op-deals" data-no-drag>${deals.map(dealCard).join('')}</div>
+        <button class="op-more" type="button"><span>Explore more</span><img src="${I}arrow-right.svg" alt=""></button></section>
+      <section class="op-sec s op-rv"><div class="op-sim"><div class="op-simc"><p>Want to try something similar to your usuals?</p>
+          <button class="op-link" type="button"><span>${esc(SIM_LINE[s.id])}</span><img src="${I}chev-blue.svg" alt=""></button></div>
+        <div class="op-simm"><img class="op-img" src="${o.similar.img}" alt="" decoding="async" loading="lazy"></div></div></section>
+      <section class="op-sec b op-rv"><div class="op-panel"><div class="op-ptitle"><p>Brands you love,</p><p>just in a fresh new deal</p></div>
+        <div class="op-car op-brands" data-no-drag>${o.brands.map(brandCard).join('')}</div>
+        <button class="op-link c" type="button"><span>Explore more</span><img src="${I}chev-blue.svg" alt=""></button></div></section>
+      <section class="op-sec op-rv"><i class="op-hair"></i>${title('', 'Want to keep it light?')}
+        <div class="op-panel l"><div class="op-lh"><b>Small treats under ${D}99</b><span>${esc(o.light.sub)}</span></div>
+          <div class="op-picks">${o.light.picks.map((p) => `<button class="op-pick" type="button"><span class="op-pm"><img class="op-img" src="${p.img}" alt="" decoding="async" loading="lazy"></span><b>${esc(p.label)}</b><span class="op-from"><i>from</i><em>${D}${money(p.from)}</em></span></button>`).join('')}</div>
+          <button class="op-link c" type="button"><span>Explore more</span><img src="${I}chev-blue.svg" alt=""></button></div></section>
+      <section class="op-sec op-rv"><i class="op-hair"></i><div class="op-title"><span class="op-pin"><img src="${I}location.svg" alt=""></span><p>Trending deals</p><span class="op-mark"><i></i>near you</span></div>
+        <div class="op-car op-trend" data-no-drag>${o.trending.map(trendCard).join('')}</div></section>
+      <div class="op-end"><button class="dv-again" type="button">Grab again</button><button class="dv-all" type="button">Explore all ${esc(s.name)} on noon →</button></div>`;
+    wire(s);
+  }
+
+  // interactions
+  function wire(s) {
+    scroller.querySelectorAll('.op-wish').forEach((w) => w.addEventListener('click', () => {
+      const onw = w.classList.toggle('is-on'); hap(onw ? 'pop' : 'tap');
+      anim(w, [{ transform: 'scale(.7)' }, { transform: 'scale(1)' }], { duration: 520, easing: EASE.pop });
+    }));
+    scroller.querySelectorAll('.op-add, .op-atc').forEach((b) => b.addEventListener('click', () => {
+      const atc = b.classList.contains('op-atc'), added = b.classList.toggle('is-added');
+      b.querySelector('span').textContent = added ? (atc ? 'Added ✓' : 'ADDED') : (atc ? 'Add to cart' : 'ADD');
+      hap(added ? 'success' : 'tap'); anim(b, [{ transform: 'scale(.9)' }, { transform: 'scale(1)' }], { duration: 520, easing: EASE.pop });
       if (added) window.orbi?.hop(1.1);
     }));
-    scroller.querySelectorAll('.k-copy').forEach((k) => k.addEventListener('click', () => {
-      try { navigator.clipboard?.writeText(k.dataset.code).catch(() => {}); } catch {}
-      k.classList.add('is-done'); k.textContent = 'COPIED'; hap('success');
-      setTimeout(() => { k.classList.remove('is-done'); k.textContent = k.dataset.code; }, 1600);
-    }));
-    // the deck: each card's product drifts against the swipe (a little depth)
-    const deck = scroller.querySelector('.dv-deck');
-    let lastSnap = -1;
-    deck.addEventListener('scroll', () => {
-      const mid = deck.scrollLeft + deck.clientWidth / 2;
-      [...deck.children].forEach((t) => { const c = t.offsetLeft + t.offsetWidth / 2, k = (c - mid) / deck.clientWidth; t.querySelector('.t-img img').style.transform = `translateX(${(-k * 26).toFixed(1)}px) rotate(${(-k * 6).toFixed(1)}deg)`; });
-      const i = Math.round(deck.scrollLeft / 184); if (i !== lastSnap) { if (lastSnap >= 0) hap('tick'); lastSnap = i; }
-    }, { passive: true });
+    scroller.querySelectorAll('.op-more, .op-link, .op-pick, .dv-all').forEach((b) => b.addEventListener('click', () => { hap('tap'); ctx.onExplore(s); }));
     scroller.querySelector('.dv-again').addEventListener('click', () => { hap('tap'); ctx.onAgain(); });
-    scroller.querySelector('.dv-all').addEventListener('click', () => { hap('tap'); ctx.onExplore(s); });
+    // centre-focus carousels: the card nearest the centre is fully opaque (Figma: neighbours at .9), a tick per snap
+    scroller.querySelectorAll('.op-car').forEach((car) => {
+      let last = -1;
+      const focus = () => {
+        const mid = car.scrollLeft + car.clientWidth / 2; let best = 0, bd = 1e9;
+        [...car.children].forEach((c, i) => { const d = Math.abs(c.offsetLeft + c.offsetWidth / 2 - mid); if (d < bd) { bd = d; best = i; } });
+        [...car.children].forEach((c, i) => c.classList.toggle('is-f', i === best));
+        if (best !== last) { if (last >= 0) hap('tick'); last = best; }
+      };
+      // start centred on the second card (as the Figma frames show), so there's a neighbour on each side
+      requestAnimationFrame(() => { const c = car.children[Math.min(1, car.children.length - 1)]; if (c) car.scrollLeft = c.offsetLeft + c.offsetWidth / 2 - car.clientWidth / 2; focus(); });
+      car.addEventListener('scroll', focus, { passive: true });
+    });
+    // swipe to buy: drag the knob to the end of the rail
+    const rail = scroller.querySelector('.op-swipe'), knob = rail.querySelector('.op-knob');
+    let drag = null, x = 0;
+    const max = () => rail.clientWidth - knob.offsetWidth - 8;
+    const place = (v) => { x = v; knob.style.transform = `translateX(${v.toFixed(1)}px)`; rail.style.setProperty('--p', (v / max()).toFixed(3)); };
+    knob.addEventListener('pointerdown', (e) => { if (rail.classList.contains('is-done')) return; drag = { x0: e.clientX, v0: x }; try { knob.setPointerCapture(e.pointerId); } catch {} hap('tap'); knob.getAnimations().forEach((a) => a.cancel()); });
+    knob.addEventListener('pointermove', (e) => { if (!drag) return; place(Math.max(0, Math.min(max(), drag.v0 + (e.clientX - drag.x0) * (375 / innerWidth || 1)))); });
+    const release = () => {
+      if (!drag) return; drag = null;
+      if (x > max() * 0.72) {
+        const from = x; place(max());
+        knob.animate([{ transform: `translateX(${from}px)` }, { transform: `translateX(${max()}px)` }], { duration: 200, easing: EASE.in });
+        rail.classList.add('is-done'); hap('success'); window.orbi?.hop(1.8);
+      } else {
+        const from = x; place(0);
+        knob.animate([{ transform: `translateX(${from}px)` }, { transform: 'translateX(0)' }], { duration: MOVE.ms, easing: EASE.move });
+      }
+    };
+    knob.addEventListener('pointerup', release); knob.addEventListener('pointercancel', release);
+    knob.addEventListener('click', () => { if (!drag && x === 0 && !rail.classList.contains('is-done')) anim(knob, [{ transform: 'translateX(0)' }, { transform: 'translateX(22px)', offset: 0.4 }, { transform: 'translateX(0)' }], { duration: 620, easing: EASE.pop }); });
   }
 
-  // the countdown: today's deal ends at midnight
-  function clock() {
-    const el = scroller.querySelector('.dv-clock'); if (!el) return;
-    const now = new Date(), end = new Date(now); end.setHours(24, 0, 0, 0);
-    const s = Math.max(0, Math.floor((end - now) / 1000)), p = (n) => String(n).padStart(2, '0');
-    el.textContent = `${p(Math.floor(s / 3600))}:${p(Math.floor(s / 60) % 60)}:${p(s % 60)}`;
-  }
-
-  // Orbi on the page: in the hero, then the bottom corner once you scroll; a line per section
-  const HERO_BOT = () => ({ cx: 334, cy: 520, unit: 19 });          // beside the words under the hero (the hero's heading has the top)
-  const CORNER = () => ({ cx: 342, cy: sheet.clientHeight - 56, unit: 15 });
-  function onScroll() {
-    const y = scroller.scrollTop;
-    const art = scroller.querySelector('.dv-art');
-    if (art) art.style.transform = `translateY(${(Math.max(0, y) * 0.35).toFixed(1)}px)`;
-    bar.classList.toggle('is-on', y > 360);
-    const c = y > 200;
-    if (c !== corner) { corner = c; window.orbi?.stage(c ? CORNER() : HERO_BOT()); if (c) ctx.hush(); }
-  }
+  function onScroll() { head.classList.toggle('is-on', scroller.scrollTop > 24); }
   scroller.addEventListener('scroll', onScroll, { passive: true });
 
   function observe() {
@@ -147,46 +163,35 @@ export function mountDiscover(ctx) {
     io = new IntersectionObserver((ents) => {
       let k = 0;
       ents.filter((e) => e.isIntersecting).forEach((e) => {
-        const el = e.target; io.unobserve(el);
-        const d = (k++) * 60;
-        anim(el, [{ transform: 'translateY(18px)' }, { transform: 'none' }], { duration: MOVE.ms, easing: EASE.move, delay: d });
+        const el = e.target; io.unobserve(el); const d = (k++) * 60;
+        anim(el, [{ transform: 'translateY(24px)' }, { transform: 'none' }], { duration: MOVE.ms, easing: EASE.move, delay: d });
         anim(el, [{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: EASE.in, delay: d });
-        const key = el.dataset.say;
-        if (key && !said.has(key) && corner) { said.add(key); setTimeout(() => on && speak(key === 'spot' ? STORY[set.id].spot : LINES[key], { hold: 2200 }), 160 + d); }
       });
-    }, { root: scroller, threshold: 0.35 });
-    scroller.querySelectorAll('.dv-rv').forEach((el) => io.observe(el));
+    }, { root: scroller, threshold: 0.12 });
+    scroller.querySelectorAll('.op-rv').forEach((el) => io.observe(el));
   }
 
-  // in: the hero's lines rise out of the card's flip side; the page under it reveals as you go
+  // in: the page fades up, the hero card rises with its product popping in; the rest reveals on scroll
   function show(s, { fromFlood = true } = {}) {
-    set = s; on = true; said = new Set(); corner = null;
-    build(s); scroller.scrollTop = 0;
+    on = true;
+    build(s); scroller.scrollTop = 0; onScroll();
     dv.classList.add('is-on');
-    clock(); clearInterval(timerT); timerT = setInterval(clock, 1000);
-    scroller.querySelectorAll('.dv-art .mc-p, .dv-art .mc-star').forEach((im, i) => {
-      anim(im, [{ translate: '0 70px', scale: '.72' }, { translate: '0 0', scale: '1' }], { duration: 760, easing: EASE.pop, delay: 120 + i * 70 });
-    });
-    const lines = [...scroller.querySelectorAll('.h-in > *')];
-    lines.forEach((el, i) => {
-      anim(el, [{ transform: 'translateY(26px)' }, { transform: 'none' }], { duration: MOVE.ms, easing: EASE.move, delay: 80 + i * 60 });
-      anim(el, [{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: EASE.in, delay: 80 + i * 60 });
-    });
-    heroIn = anim(dv, [{ opacity: 0 }, { opacity: 1 }], { duration: fromFlood ? 260 : 200, easing: EASE.in });
-    onScroll();
-    setTimeout(() => { if (on) { observe(); speak(`Welcome to ${s.name}! These are the ones I'd grab 😉`, { hold: 2600 }); } }, 380);
-    return heroIn;
+    window.orbi?.statusInk(null);
+    const a = anim(dv, [{ opacity: 0 }, { opacity: 1 }], { duration: fromFlood ? 260 : 200, easing: EASE.in });
+    const hero = scroller.querySelector('.op-hero'), heroImg = scroller.querySelector('.op-hmedia .op-img');
+    anim(scroller.querySelector('.op-hero-sec .op-title'), [{ transform: 'translateY(16px)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: MOVE.ms, easing: EASE.move, delay: 80 });
+    anim(hero, [{ transform: 'translateY(40px)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: MOVE.ms, easing: EASE.move, delay: 160 });
+    if (heroImg) anim(heroImg, [{ transform: 'translateY(30px) scale(.82)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 760, easing: EASE.pop, delay: 300 });
+    requestAnimationFrame(observe);
+    return a;
   }
   function hide({ instant = false } = {}) {
-    on = false; clearInterval(timerT); io && io.disconnect();
-    if (instant) { dv.classList.remove('is-on'); dv.getAnimations().forEach((a) => a.cancel()); return Promise.resolve(); }
+    on = false; io && io.disconnect();
+    if (instant) { dv.classList.remove('is-on'); dv.getAnimations().forEach((x) => x.cancel()); return Promise.resolve(); }
     const a = anim(dv, [{ opacity: 1 }, { opacity: 0 }], { duration: 220, easing: EASE.out });
     return a.finished.catch(() => {}).then(() => { dv.classList.remove('is-on'); a.cancel(); });
   }
   back.addEventListener('pointerdown', () => hap('tap'));
   back.addEventListener('click', () => on && ctx.onAgain());
-  return { el: dv, show, hide, get on() { return on; }, poke() {
-    const tips = ['Scroll on, there\'s more 👇', 'Psst — the coupons stack!', 'I picked these just for you 🫶'];
-    speak(tips[Math.floor(Math.random() * tips.length)], { hold: 1800 });
-  } };
+  return { el: dv, show, hide, get on() { return on; }, poke() {} };
 }

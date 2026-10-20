@@ -74,7 +74,7 @@ root.innerHTML = `
   <div class="cx-story" data-no-drag></div>
   <div class="st">
     <div class="lp-bg"><i class="lp-grid"></i><i class="lp-dots"></i></div>
-    <button class="st-back lp-icon" type="button" aria-label="Close"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M12.5 15l-5-5 5-5"/></svg></button>
+    <button class="st-back lp-icon" type="button" aria-label="Close"><img src="claw/art/lp/back.svg" width="20" height="20" alt="" draggable="false"></button>
     <div class="st-car" data-no-drag></div>
     <div class="lp-copy"><h2>Unlock your rewards</h2><p>Swipe through the deals, then hit Grab.</p></div>
     <button class="st-grab lp-cta" type="button" aria-label="Grab a deal"><span>Grab</span></button>

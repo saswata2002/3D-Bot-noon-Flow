@@ -225,10 +225,10 @@
 /* ══ the landing page, 1:1 with Figma Sas-Motion 309:49973 "01 – Landing Page (Trigger)" ══ */
 .st { background: transparent; color: #270A71; }
 .lp-bg { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, #F7F5FF 60.687%, #FFFFFF 106.84%); }
-.lp-grid { position: absolute; inset: 0; background-image: url('art/lp/grid.svg'); background-size: 375px 812px; background-position: 50% 0; }
+.lp-grid { position: absolute; inset: 0; background: url('art/lp/grid.svg') no-repeat 50% 0 / 375px 812px; }
 .lp-dots { position: absolute; left: 58.29px; top: 36.32px; width: 280.45px; height: 106px; background: url('art/lp/dots.svg') no-repeat 0 0 / 100% 100%; }
 .st-back.lp-icon { left: 16px; top: 55px; width: 36px; height: 36px; border-radius: 18px; background: #F5F0FF; box-shadow: inset 0 0 0 1px rgba(177, 147, 255, .5); }
-.st-back.lp-icon svg { width: 20px; height: 20px; fill: none; stroke: #270A71; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.st-back.lp-icon img { width: 20px; height: 20px; display: block; }
 .st-back.lp-icon:active { background: #ECE4FF; }
 /* the coupon: 244 × 325, r 23.23, a 214.9-tall #A696FF banner, the offer below, a lavender stroke */
 .st-card.lp-card { width: 244px; height: 325px; margin-left: -122px; border-radius: 23.234px; background: #FFFFFF; box-shadow: none; }
@@ -253,8 +253,3 @@
 .st-grab.lp-cta span { position: static; display: block; height: 52px; border-radius: 0; background: none; box-shadow: none; transform: none !important; animation: none !important;
   font: 600 16px/52px var(--noon); letter-spacing: 0; color: #FFFFFF; text-align: center; }
 .st-grab.lp-cta.is-down { transform: scale(.98); background: #1C0757; }
-/* (stand-ins until the Figma grid / dots / stroke SVGs are exported into art/lp) */
-.lp-grid { background-image: linear-gradient(rgba(166,150,255,.14) 1px, transparent 1px), linear-gradient(90deg, rgba(166,150,255,.14) 1px, transparent 1px); background-size: 32.7px 32.7px; background-position: -6px 0; }
-.lp-dots { background: radial-gradient(circle at 264.6px 13.1px, #C9BCFF 4.05px, transparent 4.6px), radial-gradient(circle at 277.4px 90.6px, #C9BCFF 3.05px, transparent 3.6px),
-  radial-gradient(circle at 2.3px 103.7px, #C9BCFF 2px, transparent 2.5px), radial-gradient(circle at 43px 5.2px, #C9BCFF 4.87px, transparent 5.4px); }
-.lp-stroke { background: none; box-shadow: inset 0 0 0 1.6px #CBBEFF; }

@@ -9,8 +9,9 @@
 <title>noon — Home Page</title>
 <link rel="icon" href="data:," />
 <!-- the GitFlow Home (home-app/, built from noon-app-skill): its styles first, this page's on top -->
-<link rel="stylesheet" href="/home-app/assets/index-BONP5zsg.css" />
+<link rel="stylesheet" href="/home-app/assets/index-UqrQm6OA.css" />
 <link rel="stylesheet" href="styles.css" />
+<link rel="stylesheet" href="claw/claw.css" />
 </head>
 <body>
 
@@ -64,11 +65,13 @@
   // gesture also cancels the touch the bot's hold-to-drag is using)
   document.getElementById('screen')?.addEventListener('contextmenu', (e) => e.preventDefault());
 </script>
-<script type="module" src="/home-app/assets/index-H_Oe69iU.js"></script>
+<script type="module" src="/home-app/assets/index-BMq9KHUf.js"></script>
 <script src="haptics.js"></script>
 <script type="importmap">
 { "imports": { "three": "./orbi/vendor/three.module.js" } }
 </script>
 <script type="module" src="orbi/main.js"></script>
+<!-- the bot's full page: the personalised intro → claw machine → its set's PLP -->
+<script type="module" src="claw/claw.js"></script>
 </body>
 </html>

@@ -1034,6 +1034,7 @@ const hit = document.getElementById('orbiHit') || canvas;
 let gesture = null;
 
 hit.addEventListener('pointerdown', (e) => {
+  if (locked) { haptic('tap'); hop(1.6); dispatchEvent(new CustomEvent('orbi:poke')); return; }   // (the experience runs it)
   gesture = { x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, lt: performance.now(), t: performance.now(), t0: e.timeStamp, moved: 0, axis: null, fired: false };
   haptic('tap');
   if (intro.active) { const sp = m.spin; endIntro(); m.spin = sp; }   // grab takes over mid-turn
@@ -1492,8 +1493,11 @@ function flightAt(e) {                                       // the bot's arc, H
   const c1 = { cx: a.cx - 12, cy: a.cy - (a.cy - b.cy) * 0.55 }, c2 = { cx: b.cx + 64, cy: b.cy + 90 };
   return { cx: bez(a.cx, c1.cx, c2.cx, b.cx, e), cy: bez(a.cy, c1.cy, c2.cy, b.cy, e), unit: THREE.MathUtils.lerp(a.unit, b.unit, THREE.MathUtils.clamp(e, 0, 1)) };
 }
-function goPage(open, { settle = false, v0 = 0, glide = 0 } = {}) {
+const pageEvent = (name) => dispatchEvent(new CustomEvent('orbi:page', { detail: name }));
+function goPage(open, { settle = false, v0 = 0, glide = 0, fade = false } = {}) {
   if (pageNav.open === open && !pageNav.anim && !pageNav.drag && !pageNav.show) return;
+  if (!open && pageNav.open) pageEvent('closing');
+  pageNav.fade = !open && fade;                              // (a dissolve: the page stays put and fades as Home returns)
   const fromHome = open && !settle && pageNav.p <= 0.001 && !pageNav.anim && !pageNav.drag;
   pageNav.open = open; pageNav.drag = null; pageNav.visorAt = 0; pageNav.greetAt = 0;
   sheetEl.classList.remove('is-landed');                     // travelling: round corners
@@ -1544,9 +1548,13 @@ function placePage() {
     card.style.transform = `translate(${(W * (1 - sc) / 2).toFixed(3)}px, ${(Hh * (1 - sc) / 2).toFixed(3)}px) scale(${sc.toFixed(5)})`;
   } else card.style.transform = '';
   scrim.style.opacity = (UNDER.dim * pc).toFixed(4);          // chained to the page (85 % brightness at rest)
-  if (sbar) sbar.style.setProperty('--sb-ink', '0');          // dark all the way: Home is only lightly dimmed, then the white page
+
   // (a full page never rises past the top: its bottom edge would lift off the frame and show Home under it)
-  sheetEl.style.transform = `translateY(${(Math.max(0, (1 - p) * SHEET.travel) + pageNav.lift).toFixed(2)}px)`;
+  const pageTop = pageNav.fade ? 0 : Math.max(0, (1 - p) * SHEET.travel) + pageNav.lift;
+  sheetEl.style.transform = `translateY(${pageTop.toFixed(2)}px)`;
+  sheetEl.style.opacity = pageNav.fade ? THREE.MathUtils.clamp(p * 1.6 - 0.25, 0, 1).toFixed(3) : '';   // gone a little before Home is back
+  // the page is dark: light status-bar content once it's under the bar
+  if (sbar) sbar.style.setProperty('--sb-ink', THREE.MathUtils.clamp((46 - pageTop) / 30, 0, 1).toFixed(3) * (pageNav.fade ? THREE.MathUtils.clamp(p * 1.6 - 0.25, 0, 1) : 1));
   frameView();
   const s = view.unit / 30;                                  // the Figma frame box (80 at unit 30)
   const pad = 16 * pc;                                       // on the sheet: room for the raised visor (it rises above the frame)
@@ -1586,23 +1594,26 @@ function stepPage(now) {
   pageNav.p = p;
   placePage();
   const H = SHEET.travel;
-  if (a.to === 1 && !sheetEl.classList.contains('is-landed') && (1 - p) * H < 0.5) sheetEl.classList.add('is-landed');   // landed: corners square
+  if (a.to === 1 && !sheetEl.classList.contains('is-landed') && (1 - p) * H < 0.5) { sheetEl.classList.add('is-landed'); pageEvent('arrived'); }   // landed: corners square (the page's content can start)
   const turned = !a.spin || (Math.abs(a.s) < 0.01 && Math.abs(a.sv) < 0.15);   // (≈0.6°)
   if (Math.abs(a.to - p) * H < 0.5 && Math.abs(a.v) * H < 15 && turned) {       // visually at rest (< 0.5 px, < 15 px/s)
     pageNav.anim = null; pageNav.show = null; pageNav.p = a.to; pageNav.pose.pitch = pageNav.pose.roll = 0;
     if (a.spin) { m.spin = 0; m.spinV = 0; m.home = 0; m.homing = true; m.glideF = 0; spinDetent = 0; }
     if (a.to === 1) {
-      Object.assign(view, VIEW.page);
+      if (!stage) Object.assign(view, VIEW.page);
       placePage();
       sheetEl.classList.add('is-landed');
       sheetEl.setAttribute('aria-hidden', 'false');
       pageNav.visorAt = now + SHOW.visorDelay;              // visor (if down), then the greeting
+      pageEvent('landed');
     } else {
       Object.assign(view, VIEW.home);
+      pageNav.fade = false;
       placePage();
       setSheetLive(false);
       haptic('land', 0.35);                                  // a soft landing back in its corner
       restoreVisorNow();
+      pageEvent('closed');
     }
   }
 }
@@ -1619,6 +1630,25 @@ function restoreVisorNow() {
   if (pageNav.restoreVisor && !helmet.visorDown) setVisor(true);
   pageNav.restoreVisor = false;
 }
+// ─── stage: the experience on the page (claw/claw.js) places the bot ─────────
+// orbi.stage({ cx, cy, unit }, { snap }) — while the page is open and still, the bot goes there: on a soft spring
+// (ω 11, ζ .9), or glued to it every frame (`snap`, for riding the claw machine's carriage). orbi.stage(null)
+// hands it back to its rest spot. orbi.lock(true): a tap on it is a playful hop, not a spin/drag/carry.
+let stage = null, stageSnap = false, locked = false;
+const stageV = { cx: 0, cy: 0, unit: 0 };
+function updateStage(dt) {
+  if (!pageNav.open || pageNav.anim || pageNav.drag || pageNav.show) return;
+  const t = stage || VIEW.page;
+  if (stageSnap && stage) { view.cx = t.cx; view.cy = t.cy; view.unit = t.unit; stageV.cx = stageV.cy = stageV.unit = 0; }
+  else {
+    const w = 11, z = 0.9;
+    for (const k of ['cx', 'cy', 'unit']) {
+      stageV[k] += (w * w * (t[k] - view[k]) - 2 * z * w * stageV[k]) * dt;
+      view[k] += stageV[k] * dt;
+    }
+  }
+  placePage();
+}
 function updatePage() {
   const now = performance.now();
   if (pageNav.visorAt && now >= pageNav.visorAt) {           // settled: flip the visor open (if down)…
@@ -1634,13 +1664,14 @@ function updatePage() {
     if (pageNav.open) greetOnSheet();
   }
   if (pageNav.anim) stepPage(now);
+  else updateStage(Math.min(0.05, (now - (updatePage.last || now)) / 1000) || 1 / 60);
+  updatePage.last = now;
 }
 // swipe the sheet down to dismiss: everything follows the finger
 sheetEl.addEventListener('pointerdown', (e) => {
   if (!pageNav.open || pageNav.show) return;
-  if (e.target.closest('#orbiClose')) return;                // (the close button is a button, not a drag handle)
+  if (e.target.closest('#orbiClose, button, [data-no-drag]')) return;   // (buttons are buttons, not drag handles)
   pageNav.anim = null;
-  sheetEl.classList.remove('is-landed');                     // corners round as it lifts off
   pageNav.drag = { y0: e.clientY - ((1 - pageNav.p) * SHEET.travel + pageNav.lift), ly: e.clientY, lt: performance.now(), vy: 0, armed: false, edged: false };
   try { sheetEl.setPointerCapture(e.pointerId); } catch {}
 });
@@ -1650,6 +1681,7 @@ sheetEl.addEventListener('pointermove', (e) => {
   const now = performance.now(), dt = Math.max(1, now - d.lt) / 1000;
   d.vy += ((e.clientY - d.ly) / dt - d.vy) * 0.35; d.ly = e.clientY; d.lt = now;
   const dy = e.clientY - d.y0;                               // sheet offset from its open position
+  if (dy > 2) sheetEl.classList.remove('is-landed');         // corners round as it lifts off (not on a tap)
   pageNav.p = 1 - Math.max(0, dy) / SHEET.travel;
   pageNav.lift = 0;                                          // (a full page: pulling up goes nowhere — the edge bump below says so)
   const armed = dy > DISMISS_AT;                             // haptics: a tick crossing the dismiss point (both ways)…
@@ -1665,6 +1697,7 @@ const endSheetDrag = () => {
   if (!d) return;
   pageNav.drag = null;
   const dy = (1 - pageNav.p) * SHEET.travel;
+  if (dy < 3 && Math.abs(d.vy) < 200) { pageNav.p = 1; placePage(); sheetEl.classList.add('is-landed'); return; }   // a tap, not a swipe: nothing to settle
   const v0 = THREE.MathUtils.clamp(-d.vy / SHEET.travel, -8, 8);   // px/s down → progress/s (p falls as it goes down)
   // noon motion: a fast flick (> 900 px/s) settles on the spring with its release velocity; slower releases
   // carry on from the finger's speed and ease to rest (≈0.36 s; the spring would yank them ×3 in one frame)
@@ -2061,4 +2094,8 @@ addEventListener('resize', fitFrame);
 requestAnimationFrame(frame);
 
 // small hook for automated checks
-window.orbi = { gov: GOV, tilt, restoreBot, carry, look, pageNav, get dozed() { return dozed; }, poke, goPage, view, setState, nudge, cycleColour, get theme() { return THEMES[themeIdx].name; }, helmet, toggleVisor, advance: update, faceCanvas, intro, gaze, replay: () => { setState('idle', { quiet: true }); helmet.setVisorDown(false); syncVisor(); Object.assign(intro, { active: true, t: 0, scale: 0, greeted: false, popped: false }); }, get state() { return state; }, motion: m, bodyUniforms: uniforms, bodyMat, renderer, scene, camera };
+window.orbi = {
+  stage(t, { snap = false } = {}) { stage = t ? { cx: t.cx, cy: t.cy, unit: t.unit } : null; stageSnap = !!(t && snap); },
+  lock(on) { locked = !!on; }, gazeAt(yaw, pitch) { gazeLock = yaw == null ? null : { yaw, pitch }; }, hop,
+  get pageOpen() { return pageNav.open; },
+  gov: GOV, tilt, restoreBot, carry, look, pageNav, get dozed() { return dozed; }, poke, goPage, view, setState, nudge, cycleColour, get theme() { return THEMES[themeIdx].name; }, helmet, toggleVisor, advance: update, faceCanvas, intro, gaze, replay: () => { setState('idle', { quiet: true }); helmet.setVisorDown(false); syncVisor(); Object.assign(intro, { active: true, t: 0, scale: 0, greeted: false, popped: false }); }, get state() { return state; }, motion: m, bodyUniforms: uniforms, bodyMat, renderer, scene, camera };

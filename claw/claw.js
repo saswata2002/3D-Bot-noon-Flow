@@ -82,7 +82,7 @@ root.innerHTML = `
     <div class="st-cable"></div><div class="st-claw">${CLAW_SVG}</div>
   </div>
   <div class="tx"><div class="tx-flood"></div><div class="tx-rays"></div><div class="tx-spark"></div></div>
-  <div class="cx-say l"></div>
+  <div class="cx-say l" hidden></div>
   <div class="cx-burst"></div>
   <div class="cx-confetti"></div>
 `;
@@ -114,7 +114,11 @@ function ground(bgc, ink, dark = false) {
 
 // ─── Orbi's voice: a bubble beside the bot, following it ─────────────────────────────────────────────────
 let sayAnim = null, sayHideT = 0;
+// (2026-10-20: the user asked for no speech bubbles anywhere in the flow — the bot reacts with hops, gaze and
+// its moves instead; every speak() call is kept so the lines can come back by flipping BUBBLES)
+const BUBBLES = false;
 function speak(text, { hold = 0 } = {}) {
+  if (!BUBBLES) return;
   clearTimeout(sayHideT);
   say.textContent = text;
   if (sayAnim) sayAnim.cancel();

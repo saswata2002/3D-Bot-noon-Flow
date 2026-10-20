@@ -1,13 +1,18 @@
 /* ══ Orbi's Claw ═════════════════════════════════════════════════════════════════════════════════════════
    The bot's full page (orbi/main.js opens it): a 5-beat personalised "Wrapped" intro built from the order
-   history, then a claw machine with five sets of real noon product cards. GRAB → Orbi, riding the gantry, hunts
-   (a fake-out, then the real pick, weighted by what you buy), drops the claw, grabs a card, carries it to the
-   chute — the prize pops out, and opens that set's PLP (the GitFlow PLP, home-app/, via window.nkGo).
+   history, then "Pick of the day" — a dark stage (after the user's CRED "Deal of the day" reference): a chrome
+   serif headline, a swipeable 3D carousel of five metallic cards (one per world of real noon products), each
+   previewing its best offer, and a gold GRAB button. GRAB → the carousel spins like a slot reel onto Orbi's
+   pick, Orbi flies over it and lowers a claw, which clamps the card and lifts it while the rest fall away; the
+   card bursts into a full-screen flood of its colour (light rays, sparkles), flips, and its back becomes the
+   hero of that world's discovery page (claw/discover.js) — a page made for the set, not a PLP.
    Motion: the noon standard (~/.claude/skills/noon_sas_motion) — MOVE spring 280.6/27.14 for anything that
-   moves, out-cubic 200 ms fades in, in-out-cubic fades out, 60 ms stagger in / 25 ms out, a livelier spring
-   (ζ .55) only for the reward pop; physics (the carriage glide, cable pendulum, falling card) are integrated
-   per frame. Orbi is the host: a playful arcade champ who narrates, watches the claw and cheers. ══ */
+   moves (the carousel settles on it too), out-cubic 200 ms fades in, in-out-cubic fades out, 60 ms stagger in /
+   25 ms out, EXPAND (0.4, 0.01, 0, 1.01) for the flood, a livelier spring (ζ .55) only for rewards; the claw
+   (cable, pendulum, prongs) is integrated per frame. Orbi is the host throughout: it operates the claw, narrates,
+   and follows you down the discovery page. ══ */
 import { SETS } from './catalog.js';
+import { mountDiscover } from './discover.js';
 
 // ─── who it's for: a 2026 order history (demo data) and what it adds up to ──────────────────────────────
 const USER = { name: 'Saswata' };
@@ -19,6 +24,19 @@ const ADJ = { gym: 'Gym-Going', tech: 'Tech-Savvy', scents: 'Fragrant', glow: 'G
 const NOUN = { gym: 'Athlete', tech: 'Gadget Geek', scents: 'Scent Collector', glow: 'Glow Getter', home: 'Home Chef' };
 const VIBE = `The ${ADJ[RANKED[1].set.id]} ${NOUN[RANKED[0].set.id]}`;      // e.g. "The Gym-Going Gadget Geek"
 const EVERY = Math.round(365 / ORDERS);
+
+// each world's card: a metallic gradient (the reference's foil cards), the glow its pages are lit with, and
+// the best offer inside it (the deepest discount among its products)
+const LOOK = {
+  gym: { grad: 'linear-gradient(125deg, #0b6b4a 0%, #19a873 48%, #0e5e43 100%)', glow: '#19a873', cap: 'GYM ESSENTIALS' },
+  tech: { grad: 'linear-gradient(125deg, #1f5fa5 0%, #59b6e8 50%, #2a73b8 100%)', glow: '#3d9be0', cap: 'AUDIO & WEARABLES' },
+  scents: { grad: 'linear-gradient(125deg, #4b2a7b 0%, #9b6fd6 50%, #3a1f63 100%)', glow: '#8a5cd0', cap: 'SIGNATURE PERFUMES' },
+  glow: { grad: 'linear-gradient(125deg, #a83f68 0%, #f08fb2 50%, #93365b 100%)', glow: '#e0709a', cap: 'SKINCARE & GLOW' },
+  home: { grad: 'linear-gradient(125deg, #a85a16 0%, #f2a65a 50%, #8f4c16 100%)', glow: '#e8913f', cap: 'KITCHEN UPGRADES' },
+};
+SETS.forEach((s) => Object.assign(s, LOOK[s.id], { best: Math.max(...s.products.map((p) => (p.was ? Math.round((1 - p.price / p.was) * 100) : 0))) }));
+const ORDER = ['tech', 'gym', 'scents', 'glow', 'home'].map((id) => SETS.find((s) => s.id === id));   // the carousel, your top world first
+const N = ORDER.length;
 
 // ─── motion tokens (noon standard) ───────────────────────────────────────────────────────────────────────
 const MOVE = { w: 16.75, z: 0.81, ms: 544 };
@@ -32,66 +50,63 @@ const EASE = {
   in: 'cubic-bezier(0.33, 1, 0.68, 1)',                          // FADE IN
   out: 'cubic-bezier(0.65, 0, 0.35, 1)',                         // FADE OUT (the rendered one)
   expand: 'cubic-bezier(0.4, 0.01, 0, 1.01)',                    // EXPAND card → full screen
+  fall: 'cubic-bezier(0.55, 0, 1, 0.45)',                        // gravity (in-quad-ish): things dropping away
 };
 const reduce = matchMedia('(prefers-reduced-motion: reduce)');
 const H = () => (window.Haptics || {});
 const hap = (k, ...a) => { try { H()[k] && H()[k](...a); } catch {} };
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const lerp = (a, b, t) => a + (b - a) * t;
+const wrap = (i) => ((i % N) + N) % N;
 
 // ─── page plumbing ─────────────────────────────────────────────────────────────────────────────────────
 const sheet = document.getElementById('orbiSheet');
 const root = document.createElement('div');
 root.className = 'cx';
+const CLAW_SVG = `<svg viewBox="0 0 64 56" aria-hidden="true">
+  <g class="pr" data-k="-1"><path d="M28 14 C18 22 12 34 16 50" fill="none" stroke="#d6d9e0" stroke-width="5" stroke-linecap="round"/><circle cx="16" cy="50" r="3.5" fill="#ffd23c"/></g>
+  <g class="pr" data-k="1"><path d="M36 14 C46 22 52 34 48 50" fill="none" stroke="#d6d9e0" stroke-width="5" stroke-linecap="round"/><circle cx="48" cy="50" r="3.5" fill="#ffd23c"/></g>
+  <rect x="20" y="2" width="24" height="16" rx="6" fill="#ffd23c"/><rect x="24" y="7" width="16" height="4" rx="2" fill="#7a3e00" opacity=".4"/></svg>`;
 root.innerHTML = `
   <div class="cx-ground"></div>
   <div class="cx-progress">${'<i></i>'.repeat(5)}</div>
   <div class="cx-story" data-no-drag></div>
-  <div class="cm">
-    <div class="cm-marquee"><div class="cm-bulbs"></div><span class="cm-title">ORBI'S<b>CLAW</b></span></div>
-    <div class="cm-glass">
-      <div class="cm-rail"></div><i class="cm-carriage"></i>
-      <div class="cm-cable"></div>
-      <div class="cm-claw"><svg viewBox="0 0 64 56" aria-hidden="true">
-        <g class="pr" data-k="-1"><path d="M28 14 C18 22 12 34 16 50" fill="none" stroke="#c9d0f0" stroke-width="5" stroke-linecap="round"/><circle cx="16" cy="50" r="3.5" fill="#feee00"/></g>
-        <g class="pr" data-k="1"><path d="M36 14 C46 22 52 34 48 50" fill="none" stroke="#c9d0f0" stroke-width="5" stroke-linecap="round"/><circle cx="48" cy="50" r="3.5" fill="#feee00"/></g>
-        <rect x="20" y="2" width="24" height="16" rx="6" fill="#feee00"/><rect x="24" y="7" width="16" height="4" rx="2" fill="#1d2539" opacity=".35"/>
-      </svg></div>
-      <div class="cm-chute"><span>Prize</span></div>
-      <div class="cm-glare"></div>
-    </div>
-    <div class="cm-panel">
-      <div class="cm-stick"><i></i></div>
-      <button class="cm-grab" type="button" aria-label="Grab a prize"><span>GRAB</span></button>
-      <div class="cm-coin"><b>FREE PLAY</b><span>×1</span></div>
-      <div class="cm-hint">Orbi drives — you press</div>
-    </div>
+  <div class="st">
+    <div class="st-glow"></div>
+    <button class="st-back" type="button" aria-label="Close"><svg viewBox="0 0 30 20" aria-hidden="true"><path d="M29 10H2M10 2L2 10l8 8"/></svg></button>
+    <button class="st-pill" type="button"><b>🎁</b><span>my picks</span></button>
+    <div class="st-lede">let Orbi grab you<br>a deal from 5 worlds</div>
+    <div class="st-title">PICK OF THE DAY</div>
+    <div class="st-car" data-no-drag>${ORDER.map((s, i) => `<div class="st-card" data-i="${i}" style="--g:${s.grad}">
+      <div class="c-brand"><i>${s.emoji}</i>${s.name}</div><div class="c-cap">${s.cap}</div>
+      <div class="c-band"><small style="margin:0 6px 0 0">UP TO</small>${s.best}%<small>OFF</small></div><i class="c-dim"></i></div>`).join('')}</div>
+    <div class="st-name st-swap"></div>
+    <div class="st-offer st-swap"><b></b><span>+</span><i>🎁</i></div>
+    <div class="st-peek st-swap"><u></u><span></span></div>
+    <div class="st-plinth"></div>
+    <button class="st-grab" type="button" aria-label="Grab a deal"><i></i><span>GRAB</span></button>
+    <div class="st-using">using <b>🪙 1</b> free play</div>
+    <div class="st-ban" role="button" aria-label="noon One offer"><div class="b-art"></div><div class="b-cap">NOON ONE</div>
+      <div class="b-txt">Extra 10% off everything Orbi grabs today</div><div class="b-go"><svg viewBox="0 0 14 14" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4"/></svg></div></div>
+    <div class="st-cable"></div><div class="st-claw">${CLAW_SVG}</div>
   </div>
+  <div class="tx"><div class="tx-flood"></div><div class="tx-rays"></div><div class="tx-spark"></div></div>
   <div class="cx-say l"></div>
   <div class="cx-burst"></div>
   <div class="cx-confetti"></div>
-  <div class="cx-prize"><div class="pz-band"></div><span class="pz-kick">You won</span><span class="pz-emoji"></span>
-    <div class="pz-name"></div><div class="pz-sub"></div><div class="pz-fan"><i></i><i></i><i></i></div>
-    <div class="pz-meta"><span></span><em></em></div>
-    <button class="pz-go" type="button"><i></i><span>Open my picks</span></button></div>
   <button class="cx-skip" type="button">Skip</button>`;
 sheet.appendChild(root);
 const $ = (s) => root.querySelector(s);
 const story = $('.cx-story'), progress = [...root.querySelectorAll('.cx-progress i')], skipBtn = $('.cx-skip');
-const cm = $('.cm'), glass = $('.cm-glass'), carriageEl = $('.cm-carriage'), cableEl = $('.cm-cable'), clawEl = $('.cm-claw');
-const prongs = [...clawEl.querySelectorAll('.pr')], grabBtn = $('.cm-grab'), stick = $('.cm-stick'), coin = $('.cm-coin span');
-const say = $('.cx-say'), burst = $('.cx-burst'), confetti = $('.cx-confetti'), prize = $('.cx-prize');
+const say = $('.cx-say'), burst = $('.cx-burst'), confetti = $('.cx-confetti');
 const groundEl = $('.cx-ground');
-const expander = document.createElement('div');                 // the prize → PLP hand-off layer
+const st = $('.st'), car = $('.st-car'), cards = [...root.querySelectorAll('.st-card')];
+const nameEl = $('.st-name'), offerEl = $('.st-offer'), peekEl = $('.st-peek'), grabBtn = $('.st-grab'), usingEl = $('.st-using'), banEl = $('.st-ban');
+const cableEl = $('.st-cable'), clawEl = $('.st-claw'), prongs = [...clawEl.querySelectorAll('.pr')];
+const tx = $('.tx'), flood = $('.tx-flood'), rays = $('.tx-rays'), sparks = $('.tx-spark');
+const expander = document.createElement('div');                 // the hand-off layer out to noon's PLP
 expander.className = 'cx-expander'; expander.innerHTML = '<i></i>'; root.appendChild(expander);
-const bulbs = $('.cm-bulbs');
-for (let i = 0; i < 18; i++) {                                    // marquee bulbs round the sign
-  const b = document.createElement('i'); const t = i / 18;
-  const per = 2 * (335 + 46), d = t * per;                         // walk the inner perimeter
-  const [x, y] = d < 335 ? [d, 0] : d < 381 ? [335, d - 335] : d < 716 ? [335 - (d - 381), 46] : [0, 46 - (d - 716)];
-  b.style.left = `${x - 3}px`; b.style.top = `${y - 3}px`; bulbs.appendChild(b);
-}
-const bulbEls = [...bulbs.children];
+banEl.querySelector('.b-art').innerHTML = [ORDER[0].products[0], ORDER[2].products[1]].map((p, k) => `<img src="${p.img}" alt="" style="left:${k * 30}px;top:${k * 14}px;transform:rotate(${k ? 8 : -8}deg)">`).join('');
 
 let run = 0, played = false, phase = 'off';
 const alive = (r) => r === run;
@@ -115,11 +130,23 @@ function speak(text, { hold = 0 } = {}) {
   if (sayAnim) sayAnim.cancel();
   sayAnim = anim(say, [{ opacity: 0, transform: 'scale(.86)' }, { opacity: 1, transform: 'scale(1)' }], { duration: 420, easing: EASE.pop });
   if (hold) sayHideT = setTimeout(hush, hold);
+  if (!sayLoop) { sayLoop = true; const f = () => { if (!say.textContent) { sayLoop = false; return; } if (!C.loop) placeSay(); requestAnimationFrame(f); }; requestAnimationFrame(f); }
+  placeSay();
 }
+let sayLoop = false;
 function hush() { if (!say.textContent) return; const a = anim(say, [{ opacity: 1 }, { opacity: 0 }], { duration: 160, easing: EASE.out }); a.finished.then(() => { say.textContent = ''; }, () => {}); }
+let sayBelow = false;
 function placeSay() {
   const o = window.orbi; if (!o || !say.textContent) return;
   const v = o.view, r = v.unit * 1.15;
+  say.classList.toggle('b', sayBelow);
+  if (sayBelow) {
+    say.style.maxWidth = '260px'; say.classList.remove('l', 'r');
+    const w = say.offsetWidth, x = clamp(v.cx - w + 30, 10, 375 - 10 - w);
+    say.style.setProperty('--ox', `${(v.cx - x).toFixed(0)}px`); say.style.setProperty('--ax', `${(v.cx - x).toFixed(0)}px`);
+    say.style.left = `${x.toFixed(1)}px`; say.style.top = `${(v.cy + r + 10).toFixed(1)}px`;
+    return;
+  }
   const roomR = 375 - 10 - (v.cx + r + 10), roomL = v.cx - r - 10 - 10, right = roomR >= roomL;
   say.style.maxWidth = `${Math.max(120, Math.min(220, right ? roomR : roomL))}px`;
   const w = say.offsetWidth, h = say.offsetHeight;
@@ -206,139 +233,161 @@ async function runIntro(r) {
 }
 story.addEventListener('click', () => { if (phase === 'intro' && beatNext) { const f = beatNext; beatNext = null; f(); } });
 
-// ─── 2 · the machine ─────────────────────────────────────────────────────────────────────────────────────
-const G = { W: 0, H: 0, top: 0, left: 0, railY: 12, botY: 40, botUnit: 22, cableTop: 64, L0: 30 };
-const piles = [];
-function layout() {
-  const Hh = sheet.clientHeight;
-  const y0 = 106, panel = Hh < 720 ? 132 : 150;
-  cm.style.setProperty('--y0', `${y0}px`); cm.style.setProperty('--panel', `${panel}px`);
-  const r = glass.getBoundingClientRect(), s = sheet.getBoundingClientRect();
-  Object.assign(G, { W: r.width, H: r.height, left: r.left - s.left, top: r.top - s.top });
-  G.cableTop = G.botY + G.botUnit + 2;
-  // the pit: three piles on the back shelf, two in front beside the chute
-  G.L0 = G.H < 420 ? 20 : 30;
-  // the back shelf high enough that every set's label reads, low enough that the claw at rest clears its cards
-  const back = Math.max(G.H * 0.6, G.cableTop + G.L0 + 66 + 96 * 0.86), front = G.H - 28;
-  cm.classList.toggle('is-compact', panel < 140);
-  const spots = [{ x: 0.22, y: back, s: 0.86 }, { x: 0.5, y: back, s: 0.86 }, { x: 0.78, y: back, s: 0.86 }, { x: 0.55, y: front, s: 1 }, { x: 0.83, y: front, s: 1 }];
-  piles.forEach((p, i) => { const sp = spots[i]; p.x = sp.x * G.W; p.bottom = sp.y; p.scale = sp.s; p.el.style.left = `${p.x}px`; p.el.style.top = `${p.bottom - 96 * p.scale}px`; p.el.style.transform = `scale(${p.scale})`; p.el.style.transformOrigin = '50% 0'; });
-  G.chuteX = 56; G.chuteTop = G.H - 10 - 78;
+// ─── 2 · the stage: "Pick of the day" ──────────────────────────────────────────────────────────────────
+const L = { H: 0, cy: 0, k: 1, ban: true };
+const ORBI_HOME = () => ({ cx: 322, cy: L.lede + lerp(22, 24, L.k), unit: 22 });       // where the reference has its round button
+function layoutStage() {
+  const Hh = sheet.clientHeight, k = clamp((Hh - 691) / (812 - 691), 0, 1);
+  const hh = lerp(166, 196, k), lede = lerp(100, 122, k), ty = lerp(204, 222, k), cy = lerp(256, 284, k);
+  const ny = cy + 138 + lerp(18, 30, k), oy = ny + 24, py = oy + 54, bl = py + lerp(32, 44, k), by = bl + 8, uy = by + 80, ay = uy + 38;
+  Object.assign(L, { H: Hh, k, cy, lede, ban: ay + 92 <= Hh - 12 });
+  const v = { hh, lede, ty, cy, ny, oy, py, bl, by, uy, ay };
+  for (const [n, x] of Object.entries(v)) st.style.setProperty(`--${n}`, `${x.toFixed(1)}px`);
+  banEl.style.display = L.ban ? '' : 'none';
 }
-function buildPiles() {
-  glass.querySelectorAll('.cm-pile').forEach((e) => e.remove()); piles.length = 0;
-  // the order on the shelves mixes the sets (the pick is weighted, not positional)
-  const order = ['scents', 'tech', 'glow', 'gym', 'home'].map((id) => SETS.find((s) => s.id === id));
-  order.forEach((set, i) => {
-    const el = document.createElement('div'); el.className = `cm-pile${i < 3 ? ' back' : ''}`;
-    const picks = set.products.slice(0, 3);
-    el.innerHTML = picks.map((p, k) => `<div class="cm-card" style="transform:rotate(${[-9, 7, -2][k]}deg) translate(${[-6, 6, 0][k]}px, ${[4, 2, 0][k]}px)"><img src="${p.img}" alt="" decoding="async"><b><small>AED</small> ${Math.round(p.price)}</b></div>`).join('') + `<span class="cm-tag">${set.emoji} ${set.name}</span>`;
-    glass.insertBefore(el, glass.querySelector('.cm-chute'));
-    piles.push({ set, el, cards: [...el.querySelectorAll('.cm-card')] });
+
+// the carousel: `pos` is a float card index; every card is placed from its offset to it (a coverflow)
+const C = { pos: 0, v: 0, to: 0, drag: null, spin: null, focus: -1, frozen: false, loop: false, last: 0 };
+function placeCards() {
+  cards.forEach((el, i) => {
+    if (C.frozen && el !== C.carriedEl) return;
+    if (el === C.carriedEl) return;
+    let d = i - C.pos; d = ((d % N) + N + N / 2) % N - N / 2;           // −2.5 … 2.5
+    const ad = Math.abs(d), s1 = Math.min(ad, 1);
+    const x = Math.sign(d) * (ad <= 1 ? ad * 206 : 206 + (ad - 1) * 96);
+    const rot = clamp(d, -1, 1) * 42, z = -s1 * 80 - Math.max(0, ad - 1) * 60, sc = 1 - s1 * 0.12;
+    el.style.transform = `translate3d(${x.toFixed(2)}px, 0, ${z.toFixed(1)}px) rotateY(${rot.toFixed(2)}deg) scale(${sc.toFixed(4)})`;
+    el.style.opacity = ad > 1.5 ? Math.max(0, 1 - (ad - 1.5) * 2.4).toFixed(3) : '1';
+    (el._dim || (el._dim = el.querySelector('.c-dim'))).style.opacity = (s1 * 0.38).toFixed(3);   // (an overlay, not a filter: compositor-only)
+    el.style.zIndex = String(10 - Math.round(ad * 2));
+    el.style.setProperty('--sheen', `${(d * 70).toFixed(1)}%`);
   });
 }
-
-// physics state (glass coordinates)
-const P = {
-  cx: 0, cv: 0, ct: 0, ck: { w: 9, z: 0.9 },               // carriage: a gliding spring
-  L: 30, Lv: 0, Lt: 30, Lk: { w: 9, z: 0.92 },              // cable length
-  th: 0, thv: 0,                                            // pendulum angle
-  open: 0, openv: 0, opent: 0,                              // prongs (0 closed … 1 open)
-  carried: null, falling: null, prevCv: 0, last: 0,
-};
-let looping = false, follow = false;
-function hubPos() { return { x: P.cx + Math.sin(P.th) * P.L, y: G.cableTop + Math.cos(P.th) * P.L }; }
-function tick(now) {
-  if (!looping) return;
-  const dt = Math.min(0.05, P.last ? (now - P.last) / 1000 : 1 / 60); P.last = now;
-  const sub = 1 / 240;
-  for (let left = dt; left > 1e-6; left -= sub) {
-    const h = Math.min(left, sub);
-    const a = (P.ck.w ** 2) * (P.ct - P.cx) - 2 * P.ck.z * P.ck.w * P.cv;
-    P.cv += a * h; P.cx += P.cv * h;
-    P.Lv += ((P.Lk.w ** 2) * (P.Lt - P.L) - 2 * P.Lk.z * P.Lk.w * P.Lv) * h; P.L += P.Lv * h;
-    // the claw swings on its cable: carriage acceleration kicks it, gravity brings it back, air damps it
-    // (the kick is softened: the real carriage acceleration flung it sideways — a heavy claw on a short cable sways, it doesn't fly)
-    const g = 2600, L = Math.max(24, P.L);
-    P.thv += (-(g / L) * Math.sin(P.th) - 0.42 * (a / L) * Math.cos(P.th) - 5 * P.thv) * h; P.th = clamp(P.th + P.thv * h, -0.5, 0.5);
-    P.openv += (22 * 22 * (P.opent - P.open) - 2 * 0.8 * 22 * P.openv) * h; P.open += P.openv * h;
+function stepCarousel(dt) {
+  if (C.spin) {
+    const s = C.spin, t = clamp((performance.now() - s.t0) / s.ms, 0, 1);
+    const e = 1 - Math.pow(1 - t, 4);                                       // a reel slowing to a stop (out-quart)…
+    C.pos = s.from + (s.to - s.from) * e;
+    if (t >= 1) { C.pos = s.to; C.v = 0; C.to = s.to; C.spin = null; s.res(); }
+  } else if (!C.drag) {                                                      // …everything else settles on MOVE
+    for (let left = dt; left > 1e-6; left -= 1 / 240) {
+      const h = Math.min(left, 1 / 240);
+      C.v += (MOVE.w ** 2 * (C.to - C.pos) - 2 * MOVE.z * MOVE.w * C.v) * h; C.pos += C.v * h;
+    }
   }
-  draw();
-  if (P.falling) stepFall(dt);
-  requestAnimationFrame(tick);
+  const f = wrap(Math.round(C.pos));
+  if (f !== C.focus) {
+    const first = C.focus < 0; C.focus = f;
+    if (!first) { if (!C.spin) hap('tick'); else if (performance.now() - (C.lastTick || 0) > 45) { C.lastTick = performance.now(); hap('tick'); } }
+    showInfo(ORDER[f], { quiet: !!C.spin || first });
+  }
+  placeCards();
 }
-function draw() {
-  const hub = hubPos();
-  carriageEl.style.transform = `translateX(${P.cx.toFixed(2)}px)`;
-  cableEl.style.transform = `translate(${P.cx.toFixed(2)}px, ${G.cableTop.toFixed(2)}px) rotate(${(-P.th * 57.2958).toFixed(2)}deg)`;
-  cableEl.style.height = `${Math.max(0, P.L - 2).toFixed(1)}px`;
-  clawEl.style.transform = `translate(${hub.x.toFixed(2)}px, ${hub.y.toFixed(2)}px) rotate(${(-P.th * 57.2958).toFixed(2)}deg)`;
-  const ang = lerp(6, 30, clamp(P.open, -0.1, 1.15));
-  prongs.forEach((g) => { const k = +g.dataset.k; g.setAttribute('transform', `rotate(${(k * ang).toFixed(2)} ${k < 0 ? 28 : 36} 14)`); });
-  if (P.carried) {
-    const c = P.carried, rot = -P.th * 57.2958 + c.tilt;
-    c.el.style.transform = `translate(${(hub.x - 37).toFixed(2)}px, ${(hub.y + 34).toFixed(2)}px) rotate(${rot.toFixed(2)}deg) scale(${c.scale})`;
-  }
-  // Orbi rides the carriage; it watches the claw and leans into the glide
-  const o = window.orbi;
-  if (follow && o) {
-    o.stage({ cx: G.left + P.cx, cy: G.top + G.botY, unit: G.botUnit }, { snap: true });
-    o.gazeAt(clamp(P.cv / 900, -0.3, 0.3), phase === 'grab' ? 0.4 : 0.22);
-  }
+function stageTick(now) {
+  if (!C.loop) return;
+  const dt = Math.min(0.05, C.last ? (now - C.last) / 1000 : 1 / 60); C.last = now;
+  stepCarousel(dt);
+  if (Q.on) stepClaw(dt);
   placeSay();
+  requestAnimationFrame(stageTick);
 }
-const settled = (x, t, v, eps = 0.6, veps = 14) => Math.abs(t - x) < eps && Math.abs(v) < veps;
-function until(cond, r, maxMs = 3000) {
-  return new Promise((res, rej) => { const t0 = performance.now(); const f = () => { if (!alive(r)) return rej(new Error('stale')); if (cond() || performance.now() - t0 > maxMs) return res(); requestAnimationFrame(f); }; f(); });
+// the set under the focused card: its name, its best offer, a peek at three of its picks
+let infoSwap = null;
+function fillInfo(s) {
+  nameEl.textContent = s.name;
+  offerEl.querySelector('b').textContent = `${s.best}%`;
+  const from = Math.min(...s.products.map((p) => p.price));
+  peekEl.querySelector('u').innerHTML = s.products.slice(0, 3).map((p) => `<img src="${p.img}" alt="" decoding="async">`).join('');
+  peekEl.querySelector('span').textContent = `${s.products.length} picks · from AED ${Math.floor(from)}`;
 }
-// (each step hands over once it has visibly arrived — a couple of px, slow — not on the spring's sub-pixel tail)
-const moveTo = (x, r) => { P.ct = x; stick.style.setProperty('--tilt', `${clamp((x - P.cx) / 8, -18, 18)}deg`); return until(() => settled(P.cx, P.ct, P.cv, 1.5, 30), r).then(() => stick.style.setProperty('--tilt', '0deg')); };
-const cableTo = (L, r, k = { w: 10, z: 0.9 }) => { P.Lt = L; P.Lk = k; return until(() => settled(P.L, P.Lt, P.Lv, 2, 40), r); };
-const swingCalm = (r, maxMs = 500) => until(() => Math.abs(P.th) < 0.05 && Math.abs(P.thv) < 0.4, r, maxMs);
+function showInfo(s, { quiet = false } = {}) {
+  const els = [nameEl, offerEl, peekEl];
+  if (quiet || reduce.matches) { fillInfo(s); return; }
+  // a quick swap: out 120 ms (fade out, a nudge), new content in on MOVE + 200 ms fade (25 / 60 ms staggers)
+  const dir = C.v > 0 ? -1 : 1, id = {}; infoSwap = id;
+  Promise.all(els.map((el, i) => anim(el, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: `translateX(${dir * 14}px)` }], { duration: 120, easing: EASE.out, delay: i * 25 }).finished.catch(() => {}))).then(() => {
+    if (infoSwap !== id) return;
+    fillInfo(s);
+    els.forEach((el, i) => anim(el, [{ opacity: 0, transform: `translateX(${-dir * 18}px)` }, { opacity: 1, transform: 'none' }], { duration: MOVE.ms, easing: EASE.move, delay: i * 60 }));
+  });
+}
+// drag / flick / tap the carousel
+car.addEventListener('pointerdown', (e) => {
+  if (phase !== 'ready') return;
+  C.drag = { x0: e.clientX, pos0: C.pos, lx: e.clientX, lt: performance.now(), vx: 0, moved: false, id: e.pointerId };
+  C.v = 0;
+  try { car.setPointerCapture(e.pointerId); } catch {}
+});
+car.addEventListener('pointermove', (e) => {
+  const d = C.drag; if (!d || e.pointerId !== d.id) return;
+  const now = performance.now(), dt = Math.max(1, now - d.lt) / 1000;
+  d.vx += ((e.clientX - d.lx) / dt - d.vx) * 0.4; d.lx = e.clientX; d.lt = now;
+  const dx = (e.clientX - d.x0) / (375 / innerWidth || 1);
+  if (Math.abs(dx) > 6) d.moved = true;
+  C.pos = d.pos0 - dx / 206;
+});
+const endCarDrag = (e) => {
+  const d = C.drag; if (!d) return; C.drag = null;
+  if (!d.moved) {                                                    // a tap: a side card comes to the front
+    const el = e.target.closest && e.target.closest('.st-card');
+    if (el) {
+      let dd = +el.dataset.i - C.pos; dd = ((dd % N) + N + N / 2) % N - N / 2;
+      if (Math.abs(dd) > 0.5) { C.to = Math.round(C.pos + dd); hap('tap'); }
+      else { C.to = Math.round(C.pos); window.orbi?.hop(1); hap('tap'); speak(`${ORDER[C.focus].line} Hit GRAB 👇`, { hold: 1500 }); }
+    }
+    return;
+  }
+  // a flick: the release speed carries it on (≤ 2 cards), it settles on the nearest card with MOVE
+  const vc = -d.vx / 206;
+  const proj = C.pos + vc * 0.16;
+  C.to = clamp(Math.round(proj), Math.round(d.pos0) - 2, Math.round(d.pos0) + 2);
+  C.v = clamp(vc, -12, 12);
+};
+car.addEventListener('pointerup', endCarDrag);
+car.addEventListener('pointercancel', endCarDrag);
+const spinTo = (to, ms) => new Promise((res) => { C.spin = { from: C.pos, to, t0: performance.now(), ms: reduce.matches ? 200 : ms, res }; });
 
-async function showMachine(r, { again = false } = {}) {
-  phase = 'machine';
+// the stage comes in: the navy of the last beat deepens to the stage's black, the glows bloom, the headline
+// rises, the cards sweep in from the right, the controls follow (60 ms stagger)
+const ENTER = () => [$('.st-lede'), $('.st-title'), nameEl, offerEl, peekEl, $('.st-plinth'), grabBtn, usingEl, banEl, $('.st-pill'), $('.st-back')];
+async function showStage(r, { again = false } = {}) {
+  phase = 'stage';
   const o = window.orbi;
-  root.classList.remove('is-intro');
+  root.classList.remove('is-intro'); sheet.classList.add('cx-dark');
   anim(skipBtn, [{ opacity: 1 }, { opacity: 0 }], { duration: 160, easing: EASE.out }); skipBtn.style.pointerEvents = 'none';
   anim($('.cx-progress'), [{ opacity: 1 }, { opacity: 0 }], { duration: 200, easing: EASE.out });
-  ground('#F2F3F7', '#1D2539');
+  ground('#050506', '#FFFFFF', true);
   o.setState('idle');
-  buildPiles(); cm.classList.add('is-on'); layout();
-  Object.assign(P, { cx: G.W / 2, cv: 0, ct: G.W / 2, L: G.L0, Lt: G.L0, Lv: 0, th: 0, thv: 0, open: 0, opent: 0, carried: null, falling: null, last: 0 });
-  // the cabinet rises (MOVE + fade), the bulbs light up, the sets drop onto the shelves (60 ms stagger)
-  anim(cm, [{ transform: 'translateY(70px)' }, { transform: 'none' }], { duration: MOVE.ms, easing: EASE.move });
-  anim(cm, [{ opacity: 0 }, { opacity: 1 }], { duration: 300, easing: EASE.in });
-  [cableEl, clawEl, carriageEl].forEach((e) => anim(e, [{ opacity: 0 }, { opacity: 1 }], { duration: 300, easing: EASE.in, delay: 260 }));
-  piles.forEach((p, i) => {
-    anim(p.el, [{ translate: '0 -26px' }, { translate: '0 0' }], { duration: MOVE.ms, easing: EASE.move, delay: 200 + i * 60 });
-    anim(p.el, [{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: EASE.in, delay: 200 + i * 60 });
+  layoutStage();
+  st.getAnimations({ subtree: true }).forEach((a) => a.cancel());
+  Object.assign(C, { frozen: false, carriedEl: null, drag: null, spin: null, v: 0, focus: -1 });
+  cards.forEach((c) => { c.style.transformOrigin = ''; c.style.visibility = ''; });
+  if (!again) { C.pos = -2.6; C.to = 0; }                                // (the sweep: the cards glide in on MOVE)
+  else { C.to = Math.round(C.pos); C.pos = C.to - 1.4; }
+  st.classList.add('is-on');
+  C.loop = true; C.last = 0; requestAnimationFrame(stageTick);
+  anim($('.st-glow'), [{ opacity: 0 }, { opacity: 1 }], { duration: 400, easing: EASE.out });
+  ENTER().forEach((el, i) => {
+    anim(el, [{ transform: 'translateY(22px)' }, { transform: 'none' }], { duration: MOVE.ms, easing: EASE.move, delay: 60 + i * 40 });
+    anim(el, [{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: EASE.in, delay: 60 + i * 40 });
   });
-  setTimeout(() => alive(r) && hap('land', 0.6), 420);
-  bulbsOn(r);
-  looping = true; requestAnimationFrame(tick);
-  // Orbi hops down onto the gantry
-  o.stage({ cx: G.left + G.W / 2, cy: G.top + G.botY, unit: G.botUnit });
-  o.gazeAt(0, 0.22);
-  await wait(again ? 380 : 520, r);
-  follow = true;
+  usingEl.innerHTML = again ? 'using <b>🪙 1</b> bonus play' : 'using <b>🪙 1</b> free play';
+  setTimeout(() => alive(r) && hap('land', 0.5), 260);
+  // Orbi settles into the header, where it operates the claw from
+  o.stage(ORBI_HOME()); o.gazeAt(-0.3, 0.3); sayBelow = true;
+  await wait(again ? 420 : 620, r);
   o.lock(true);
-  speak(again ? 'Back for another round? 🎰' : `Ready, champ? Smash GRAB and I'll snag you something good!`);
+  speak(again ? 'Back for another round? 🎰' : 'Swipe the worlds, then hit GRAB 👇', { hold: again ? 1800 : 3000 });
   grabBtn.disabled = false; grabBtn.classList.add('is-ready');
   phase = 'ready';
 }
-let bulbT = 0;
-function bulbsOn(r) {
-  clearInterval(bulbT); let k = 0;
-  bulbT = setInterval(() => { if (!alive(r)) { clearInterval(bulbT); return; } k++; bulbEls.forEach((b, i) => b.classList.toggle('on', (i + k) % 3 === 0)); }, phase === 'grab' ? 90 : 180);
-}
 
-// ─── 3 · GRAB ────────────────────────────────────────────────────────────────────────────────────────────
+// ─── 3 · GRAB: the reel spins onto Orbi's pick, the claw comes down, clamps it, lifts it ──────────────────
 let lastPick = null;
 function pickSet() {
-  // weighted by what you buy (your top set is likeliest), never the same twice in a row
-  const pool = piles.filter((p) => p.set.id !== lastPick && p.cards.length);
-  const wts = pool.map((p) => (HISTORY[p.set.id] || 4) + 3);
+  // weighted by what you buy (your top world is likeliest), never the same twice in a row
+  const pool = ORDER.filter((s) => s.id !== lastPick);
+  const wts = pool.map((s) => (HISTORY[s.id] || 4) + 3);
   let x = Math.random() * wts.reduce((a, b) => a + b, 0);
   for (let i = 0; i < pool.length; i++) { x -= wts[i]; if (x <= 0) return pool[i]; }
   return pool[0];
@@ -347,158 +396,198 @@ grabBtn.addEventListener('pointerdown', () => { if (!grabBtn.disabled) { grabBtn
 ['pointerup', 'pointercancel', 'pointerleave'].forEach((ev) => grabBtn.addEventListener(ev, () => grabBtn.classList.remove('is-down')));
 grabBtn.addEventListener('click', () => { if (phase === 'ready') grab(run).catch(() => {}); });
 
+// the claw hangs from Orbi: Orbi's spot glides on a spring, the cable reels, the claw swings as a pendulum
+const Q = { on: false, x: 0, vx: 0, tx: 0, y: 0, vy: 0, ty: 0, L: 0, Lv: 0, Lt: 0, th: 0, thv: 0, open: 0, openv: 0, opent: 0, k: { w: 9, z: 0.92 } };
+const cableTop = () => Q.y + 19;                                           // (from under the ball)
+const hubPos = () => ({ x: Q.x + Math.sin(Q.th) * Q.L, y: cableTop() + Math.cos(Q.th) * Q.L });
+function stepClaw(dt) {
+  for (let left = dt; left > 1e-6; left -= 1 / 240) {
+    const h = Math.min(left, 1 / 240);
+    const ax = Q.k.w ** 2 * (Q.tx - Q.x) - 2 * Q.k.z * Q.k.w * Q.vx; Q.vx += ax * h; Q.x += Q.vx * h;
+    const ay = Q.k.w ** 2 * (Q.ty - Q.y) - 2 * Q.k.z * Q.k.w * Q.vy; Q.vy += ay * h; Q.y += Q.vy * h;
+    Q.Lv += (100 * (Q.Lt - Q.L) - 2 * 0.92 * 10 * Q.Lv) * h; Q.L += Q.Lv * h;
+    const g = 2600 + ay * 0.3, Ln = Math.max(24, Q.L);
+    Q.thv += (-(g / Ln) * Math.sin(Q.th) - 0.42 * (ax / Ln) * Math.cos(Q.th) - 4 * Q.thv) * h; Q.th = clamp(Q.th + Q.thv * h, -0.45, 0.45);
+    Q.openv += (22 * 22 * (Q.opent - Q.open) - 2 * 0.8 * 22 * Q.openv) * h; Q.open += Q.openv * h;
+  }
+  const hub = hubPos(), deg = -Q.th * 57.2958;
+  cableEl.style.transform = `translate(${Q.x.toFixed(2)}px, ${cableTop().toFixed(2)}px) rotate(${deg.toFixed(2)}deg)`;
+  cableEl.style.height = `${Math.max(0, Q.L - 2).toFixed(1)}px`;
+  clawEl.style.transform = `translate(${hub.x.toFixed(2)}px, ${hub.y.toFixed(2)}px) rotate(${deg.toFixed(2)}deg)`;
+  const ang = lerp(6, 30, clamp(Q.open, -0.1, 1.15));
+  prongs.forEach((p) => { const k = +p.dataset.k; p.setAttribute('transform', `rotate(${(k * ang).toFixed(2)} ${k < 0 ? 28 : 36} 14)`); });
+  if (C.carriedEl) C.carriedEl.style.transform = `translate3d(${(hub.x - 187.5).toFixed(2)}px, ${(hub.y + 30 - L.cy).toFixed(2)}px, 0) rotate(${(deg + C.tilt).toFixed(2)}deg)`;
+  const o = window.orbi;
+  if (o && Q.follow) { o.stage({ cx: Q.x, cy: Q.y, unit: 22 }, { snap: true }); o.gazeAt(clamp(Q.vx / 900, -0.3, 0.3), 0.42); }
+}
+const settled = (x, t, v, eps = 1.5, veps = 30) => Math.abs(t - x) < eps && Math.abs(v) < veps;
+function until(cond, r, maxMs = 3000) {
+  return new Promise((res, rej) => { const t0 = performance.now(); const f = () => { if (!alive(r)) return rej(new Error('stale')); if (cond() || performance.now() - t0 > maxMs) return res(); requestAnimationFrame(f); }; f(); });
+}
+const cableTo = (Ln, r) => { Q.Lt = Ln; return until(() => settled(Q.L, Q.Lt, Q.Lv, 2, 40), r); };
+
 async function grab(r) {
   phase = 'grab'; grabBtn.disabled = true; grabBtn.classList.remove('is-ready');
-  hap('snap'); bulbsOn(r);
-  coin.textContent = '×0';
+  hap('snap');
+  usingEl.innerHTML = '<b>🪙 0</b> plays left — good luck!';
   const o = window.orbi;
-  const target = pickSet(); lastPick = target.set.id;
-  // the fake-out: first a neighbour on the far side, then the real one
-  const others = piles.filter((p) => p !== target);
-  const fake = others.sort((a, b) => Math.abs(b.x - target.x) - Math.abs(a.x - target.x))[Math.floor(Math.random() * 2)];
-  o.setState('working');
-  speak('Ooh… let me see 👀');
-  await moveTo(fake.x, r); hap('tick');
-  fake.el.classList.add('is-aim');
-  speak('This one? Hmm… nah!');
-  await wait(360, r);
-  fake.el.classList.remove('is-aim');
-  hush();
-  await moveTo(target.x, r); hap('tick');
-  target.el.classList.add('is-aim');
-  speak('THIS one! ✨');
-  await swingCalm(r, 420);
-  // drop: the prongs open on the way down, the claw meets the top card
-  const card = target.cards[target.cards.length - 1];
-  const topY = target.bottom - 96 * target.scale;
-  P.opent = 1;
-  await cableTo(topY - 22 - G.cableTop, r, { w: 10, z: 1 });
+  const target = pickSet(); lastPick = target.id;
+  const ti = ORDER.indexOf(target);
+  o.setState('working'); o.gazeAt(-0.1, 0.5);
+  speak('Spinning the worlds… 🎰');
+  // the reel: two full turns and onto the pick (out-quart, ~1.7 s; a tick per card)
+  const base = Math.round(C.pos), off = ((ti - wrap(base)) + N) % N;
+  await spinTo(base + 2 * N + off, 1750);
+  if (!alive(r)) throw new Error('stale');
+  hap('snap'); sayBelow = false;
+  speak(`${target.emoji} ${target.name}! Grabbing it…`);
+  const card = cards[ti];
+  anim(card, [{ transform: card.style.transform }, { transform: `${card.style.transform} scale(1.06)`, offset: 0.35 }, { transform: card.style.transform }], { duration: 420, easing: EASE.pop });
+  // the headline makes room; Orbi flies over the card
+  [$('.st-title'), $('.st-lede')].forEach((el) => anim(el, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-10px)' }], { duration: 200, easing: EASE.out }));
+  const y0 = L.cy - 132;
+  o.stage({ cx: 187.5, cy: y0, unit: 22 });
+  await until(() => Math.abs(o.view.cy - y0) < 3 && Math.abs(o.view.cx - 187.5) < 3, r, 900);
+  // the claw drops out of Orbi: prongs open on the way down, close on the card's top edge
+  Object.assign(Q, { on: true, follow: true, x: o.view.cx, tx: 187.5, vx: 0, y: o.view.cy, ty: y0, vy: 0, L: 4, Lt: 4, Lv: 0, th: 0, thv: 0, open: 0, opent: 1 });
+  [cableEl, clawEl].forEach((e) => anim(e, [{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: EASE.in }));
+  hap('tick');
+  await cableTo(L.cy - 30 - cableTop(), r);
   hap('land', 0.5);
-  P.opent = -0.05; await wait(170, r);
+  Q.opent = -0.05; await wait(160, r);
   hap('snap');
-  // the card is in the claw: lift it out of its pile into the glass, keeping where it was on screen
-  const cr = card.getBoundingClientRect(), gr = glass.getBoundingClientRect();
-  card.classList.add('carried'); glass.appendChild(card);
-  card.style.left = '0px'; card.style.top = '0px';
-  target.cards.pop();
-  const hub = hubPos();
-  P.carried = { el: card, tilt: (Math.random() - 0.5) * 10, scale: target.scale };
-  // (snap from its pile spot to the claw's grip over the lift — no jump: it starts where it lay)
-  const from = { x: cr.left - gr.left - (hub.x - 37), y: cr.top - gr.top - (hub.y + 34) };
-  const grip = anim(card, [{ translate: `${from.x}px ${from.y}px` }, { translate: '0 0' }], { duration: 260, easing: EASE.in });
-  target.el.classList.remove('is-aim');
+  C.carriedEl = card; C.tilt = 0; C.frozen = true;
+  card.getAnimations().forEach((a) => a.cancel()); card.style.transformOrigin = '50% 0'; card.style.zIndex = '20';
   speak('Gotcha! 🎉');
-  await cableTo(G.L0, r, { w: 10, z: 0.85 });
-  grip.cancel(); card.style.translate = '';
-  // over to the chute, the prize swinging
-  hush();
-  await moveTo(G.chuteX, r);
-  await swingCalm(r, 380);
-  P.opent = 1; hap('tick');
-  const h2 = hubPos();
-  P.falling = { el: card, x: h2.x - 37, y: h2.y + 34, vx: P.cv * 0.2 + Math.sin(P.th) * 60, vy: 0, rot: -P.th * 57.3 + P.carried.tilt, vr: (Math.random() - 0.5) * 240, scale: P.carried.scale, set: target.set, done: false };
-  P.carried = null;
-  await until(() => !P.falling || P.falling.done, r, 1500);
-  P.opent = 0;
-  await reveal(target.set, r);
-}
-function stepFall(dt) {
-  const f = P.falling;
-  f.vy += 2600 * dt; f.x += f.vx * dt; f.y += f.vy * dt; f.rot += f.vr * dt;
-  f.el.style.transform = `translate(${f.x.toFixed(1)}px, ${f.y.toFixed(1)}px) rotate(${f.rot.toFixed(1)}deg) scale(${f.scale})`;
-  if (!f.done && f.y > G.chuteTop + 18) {
-    f.done = true; hap('land', 0.9);
-    anim(f.el, [{ opacity: 1 }, { opacity: 0 }], { duration: 120, easing: EASE.out }).finished.then(() => { f.el.remove(); }, () => f.el.remove());
-    anim($('.cm-chute'), [{ transform: 'scale(1)' }, { transform: 'scale(1.06, .94)' }, { transform: 'scale(1)' }], { duration: 340, easing: EASE.pop });
-  }
-  if (f.y > G.H + 40) P.falling = null;
+  o.setState('greeting');
+  // the others drop away, the controls clear out (25 ms stagger), the card is lifted with a swing
+  cards.filter((c) => c !== card).forEach((c, i) => {
+    const m = new DOMMatrix(getComputedStyle(c).transform), side = m.m41 < 0 ? -1 : 1;
+    anim(c, [{ transform: c.style.transform, opacity: +c.style.opacity || 1 }, { transform: `${c.style.transform} translate3d(${side * 30}px, 520px, 0) rotateZ(${side * (14 + i * 4)}deg)`, opacity: 0 }], { duration: 620, easing: EASE.fall, delay: i * 25 });
+  });
+  [nameEl, offerEl, peekEl, $('.st-plinth'), grabBtn, usingEl, banEl].forEach((el, i) => anim(el, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(26px)' }], { duration: 200, easing: EASE.out, delay: i * 25 }));
+  setTimeout(() => alive(r) && hap('land', 0.4), 420);
+  Q.ty = y0 - 26; Q.tx = 187.5 + 18; Q.Lt = Math.max(30, Q.L - 52);
+  await wait(240, r); Q.tx = 187.5;
+  await wait(520, r);
+  await toDiscover(target, card, r);
 }
 
-// ─── 4 · the prize ──────────────────────────────────────────────────────────────────────────────────────
-let autoGo = null, prizeSet = null;
-async function reveal(set, r) {
-  phase = 'won'; prizeSet = set;
+// ─── 4 · the full-screen transition: the card floods the screen in its colour, flips, becomes the hero ───
+let discoverSet = null;
+async function toDiscover(set, card, r) {
+  phase = 'tx';
   const o = window.orbi;
-  // the prize card pops out of the chute and flies to the middle (a reward: the livelier spring)
-  prize.style.setProperty('--tint', set.tint);
-  prize.querySelector('.pz-emoji').textContent = set.emoji;
-  prize.querySelector('.pz-name').textContent = set.name;
-  const from = Math.min(...set.products.map((p) => p.price));
-  prize.querySelector('.pz-sub').textContent = 'Orbi picked these just for you';
-  prize.querySelector('.pz-meta span').textContent = `${set.products.length} picks`;
-  prize.querySelector('.pz-meta em').textContent = `from AED ${Math.floor(from)}`;
-  prize.querySelectorAll('.pz-fan i').forEach((i, k) => { i.innerHTML = `<img src="${set.products[k].img}" alt="">`; });
-  const Wp = 311, Hp = 404, Hh = sheet.clientHeight;
-  const end = { x: (375 - Wp) / 2, y: clamp((Hh - Hp) / 2 + 20, 100, Hh - Hp - 16) };
-  const s0 = 92 / Wp, st = { x: G.left + 10, y: G.top + G.chuteTop };
-  prize.classList.add('is-on');
-  prize.style.transform = `translate(${end.x}px, ${end.y}px)`;
-  const pop = anim(prize, [{ transform: `translate(${st.x}px, ${st.y}px) scale(${s0}) rotate(-12deg)` }, { transform: `translate(${end.x}px, ${end.y}px) scale(1) rotate(0deg)` }], { duration: 760, easing: EASE.pop });
-  anim(prize, [{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: EASE.in });
-  prize.querySelectorAll('.pz-fan i').forEach((i, k) => anim(i, [{ transform: 'rotate(0deg) translateY(10px)' }, { transform: `rotate(${[-16, 0, 16][k]}deg) translate(${[-58, 0, 58][k]}px, ${[14, 0, 14][k]}px)` }], { duration: 760, easing: EASE.pop, delay: 180 + k * 60 }));
-  // the cabinet steps back behind it
-  anim(cm, [{ opacity: 1, filter: 'blur(0px)', transform: 'none' }, { opacity: 0.35, filter: 'blur(4px)', transform: 'scale(.96)' }], { duration: 380, easing: EASE.out });
-  hap('success'); o.setState('greeting'); o.hop(2.2);
-  follow = false;
-  o.stage({ cx: 187.5, cy: Math.max(78, end.y - 40), unit: 30 }); o.gazeAt(0, 0.35);
-  setTimeout(() => alive(r) && confettiBurst(end.x + Wp / 2, end.y + 140, set.accent), 260);
-  speak(set.line, {});
-  await done(pop, r);
-  // it opens by itself in a beat (the bar fills), or tap
-  const bar = prize.querySelector('.pz-go i');
-  autoGo = anim(bar, [{ '--f': 0 }, { '--f': 1 }], { duration: reduce.matches ? 600 : 2600, easing: 'linear' });
-  autoGo.finished.then(() => { if (alive(r) && phase === 'won') toPLP(r); }).catch(() => {});
+  hush();
+  const s = sheet.getBoundingClientRect(), cr = card.getBoundingClientRect(), Hh = sheet.clientHeight;
+  const k = 375 / s.width;                                          // (screen px → layout px)
+  const cx = (cr.left + cr.width / 2 - s.left) * k, cy = (cr.top + cr.height / 2 - s.top) * k;
+  // the flying card: a copy with a back (the next page's title), started exactly where the claw holds it
+  const fc = document.createElement('div');
+  fc.className = 'tx-card'; fc.style.setProperty('--g', set.grad);
+  fc.innerHTML = `<div class="tx-front">${card.innerHTML}</div><div class="tx-back"><div><b>${set.name}</b><small>ORBI'S PICK OF THE DAY</small></div></div>`;
+  tx.appendChild(fc); tx.style.setProperty('--g', set.grad); tx.classList.add('is-on');
+  flood.style.clipPath = `circle(0px at ${cx}px ${cy}px)`;
+  const rot0 = -Q.th * 57.2958 + C.tilt;
+  const at = (x, y, sc, ry, rz = 0) => `translate(${(x - 114).toFixed(1)}px, ${(y - 69).toFixed(1)}px) rotateZ(${rz}deg) rotateY(${ry}deg) scale(${sc})`;
+  card.style.visibility = 'hidden';
+  // the claw lets go and reels back into Orbi
+  Q.opent = 1; Q.Lt = 0; hap('pop');
+  [cableEl, clawEl].forEach((e) => anim(e, [{ opacity: 1 }, { opacity: 0 }], { duration: 260, easing: EASE.out, delay: 120 }));
+  const ex = 187.5, ey = Hh * 0.46;
+  // the card: to the middle, turning over (MOVE, a touch longer for the flip), growing
+  const fly = anim(fc, [{ transform: at(cx, cy, 1, 0, rot0.toFixed(2)) }, { transform: at(ex, ey, 1.28, 180) }], { duration: 1000, easing: HAS_LINEAR ? linearOf(10, 0.8, 1000) : EASE.move });
+  // the flood: a circle in the card's colour from the card's centre to past the corners (EXPAND)
+  const R = Math.hypot(Math.max(cx, 375 - cx), Math.max(cy, Hh - cy)) + 20;
+  const fl = anim(flood, [{ clipPath: `circle(0px at ${cx}px ${cy}px)` }, { clipPath: `circle(${R}px at ${cx}px ${cy}px)` }], { duration: 560, easing: EASE.expand, delay: 90 });
+  // light rays spin up behind the card, sparkles burst out of it
+  anim(rays, [{ opacity: 0, transform: `translate(${ex - 187.5}px, ${ey - Hh / 2}px) rotate(0deg) scale(.6)` }, { opacity: 0.95, transform: `translate(${ex - 187.5}px, ${ey - Hh / 2}px) rotate(40deg) scale(1)`, offset: 0.4 }, { opacity: 0, transform: `translate(${ex - 187.5}px, ${ey - Hh / 2}px) rotate(80deg) scale(1.15)` }], { duration: 1500, easing: 'cubic-bezier(.33,.6,.4,1)', delay: 160 });
+  sparkBurst(ex, ey, r);
+  setTimeout(() => alive(r) && hap('snap'), 420);
+  Q.follow = false;
+  o.stage({ cx: 322, cy: 96, unit: 24 }); o.gazeAt(-0.2, 0.25);
+  setTimeout(() => alive(r) && o.hop(2), 380);
+  await done(fly, r);
+  await done(fl, r).catch(() => {});
+  C.loop = false; Q.on = false;
+  // the hand-off: the page arrives under the flood (its hero is the same colour), the card's back rises and
+  // dissolves into the hero's title, the flood fades away
+  discoverSet = set;
+  st.classList.remove('is-on');
+  disc.show(set);
+  fc.querySelector('.tx-front').style.visibility = 'hidden';
+  anim(fc, [{ transform: at(ex, ey, 1.28, 180) }, { transform: at(ex, ey - 40, 1.6, 180) }], { duration: 300, easing: EASE.out });
+  anim(fc.querySelector('.tx-back'), [{ opacity: 1 }, { opacity: 0 }], { duration: 300, easing: EASE.out });
+  const fo = anim(flood, [{ opacity: 1 }, { opacity: 0 }], { duration: 320, easing: EASE.out, delay: 80 });
+  hap('success');
+  await done(fo, r).catch(() => {});
+  tx.classList.remove('is-on'); fc.remove(); flood.getAnimations().forEach((a) => a.cancel()); flood.style.clipPath = '';
+  phase = 'discover';
 }
-prize.querySelector('.pz-go').addEventListener('click', () => { if (phase === 'won') { hap('tap'); toPLP(run); } });
-function confettiBurst(x, y, c) {
-  confetti.innerHTML = '';
-  const cols = [c, '#FEEE00', '#3866DF', '#0F8857', '#FF9741'];   // DS: the set's accent, brand yellow, CTA blue, success, warning
-  for (let i = 0; i < 46; i++) {
-    const e = document.createElement('i'); e.style.background = cols[i % cols.length]; confetti.appendChild(e);
-    const a = -Math.PI / 2 + (Math.random() - 0.5) * 2.6, v = 380 + Math.random() * 520, T = 1.3 + Math.random() * 0.5;
-    const pts = []; for (let k = 0; k <= 8; k++) { const t = (k / 8) * T; pts.push({ transform: `translate(${(x + Math.cos(a) * v * t).toFixed(1)}px, ${(y + Math.sin(a) * v * t + 900 * t * t).toFixed(1)}px) rotate(${(k * 80 * (i % 2 ? 1 : -1)).toFixed(0)}deg) scale(${(1 - k / 16).toFixed(2)})`, opacity: k > 5 ? (8 - k) / 3 : 1 }); }
-    anim(e, pts, { duration: T * 1000, easing: 'linear' });
+function sparkBurst(x, y, r) {
+  sparks.innerHTML = '';
+  for (let i = 0; i < 28; i++) {
+    const e = document.createElement('i'); sparks.appendChild(e);
+    const a = (i / 28) * Math.PI * 2 + Math.random() * 0.3, d = 110 + Math.random() * 190, sz = 0.5 + Math.random() * 1.1;
+    anim(e, [{ transform: `translate(${x}px, ${y}px) scale(0)`, opacity: 0 }, { transform: `translate(${x + Math.cos(a) * d * 0.55}px, ${y + Math.sin(a) * d * 0.55}px) scale(${sz})`, opacity: 1, offset: 0.35 },
+      { transform: `translate(${x + Math.cos(a) * d}px, ${y + Math.sin(a) * d}px) scale(0)`, opacity: 0 }], { duration: 900 + Math.random() * 500, easing: 'cubic-bezier(.2,.7,.3,1)', delay: 180 + Math.random() * 120 });
   }
 }
 
-// ─── 5 · into the PLP ────────────────────────────────────────────────────────────────────────────────────
-async function toPLP(r) {
-  if (phase !== 'won') return;
-  phase = 'leave';
-  if (autoGo) autoGo.cancel?.();
-  const o = window.orbi, set = prizeSet;
-  hush();
-  speak('Let\'s go shopping! 🛍️', { hold: 700 });
-  // the PLP for the set loads underneath (the page still covers it)
+// ─── 5 · the discovery page (claw/discover.js), and the ways out of it ───────────────────────────────────
+const disc = mountDiscover({
+  root, sheet, anim, EASE, MOVE, hap, reduce,
+  speak: (t, o) => speak(t, o), hush: () => hush(),
+  onAgain: () => { if (phase === 'discover') backToStage(run).catch(() => {}); },
+  onExplore: (s) => { if (phase === 'discover') toPLP(s, run).catch(() => {}); },
+});
+async function backToStage(r) {
+  phase = 'back'; hush();
+  const o = window.orbi;
+  o.setState('idle');
+  await disc.hide();
+  if (!alive(r)) return;
+  await showStage(r, { again: true });
+}
+// "Explore all on noon": the GitFlow PLP for the set loads underneath, a white layer covers the page, the page dissolves into it
+async function toPLP(set, r) {
+  phase = 'leave'; hush();
+  const o = window.orbi;
+  speak('Let\'s see everything! 🛍️', { hold: 700 });
   try { window.nkGo && window.nkGo('plp/listing', { query: set.query }); } catch {}
-  // the prize grows to the whole page (noon EXPAND: (0.4, 0.01, 0, 1.01), 400 ms), its content fades first,
-  // then it turns the PLP's white — and the page dissolves into the PLP as Orbi flies home
-  // (a plain layer in the set's colour grows out of the card's exact shape — the card's own content never
-  // scales: it fades underneath — then turns the PLP's white)
-  const pr = prize.getBoundingClientRect(), s = sheet.getBoundingClientRect(), Hh = sheet.clientHeight;
-  const x = pr.left - s.left, y = pr.top - s.top;
-  [...prize.children].forEach((k) => anim(k, [{ opacity: 1 }, { opacity: 0 }], { duration: 140, easing: EASE.out }));
-  await wait(120, r).catch(() => {});                         // (the card is plain white now — the PLP's surface)
-  expander.style.background = '#FFFFFF'; expander.style.display = 'block';
-  const inset = (t, rgt, b, l, rad) => `inset(${t}px ${rgt}px ${b}px ${l}px round ${rad}px)`;
-  const grow = anim(expander, [{ clipPath: inset(y, 375 - x - pr.width, Hh - y - pr.height, x, 30) }, { clipPath: inset(0, 0, 0, 0, 0) }], { duration: 420, easing: EASE.expand });
-  anim(expander.firstChild, [{ opacity: 0 }, { opacity: 1 }], { duration: 220, easing: EASE.in, delay: 230 });
+  expander.style.background = '#FFFFFF'; expander.style.display = 'block'; expander.style.clipPath = 'none';
+  const a = anim(expander, [{ opacity: 0 }, { opacity: 1 }], { duration: 300, easing: EASE.out });
   hap('snap');
-  await done(grow, r).catch(() => {});
-  await wait(120, r).catch(() => {});
-  o.lock(false); o.stage(null); o.gazeAt(null); o.setState('idle');
+  await done(a, r).catch(() => {});
+  o.lock(false); o.stage(null); o.gazeAt(null); o.setState('idle'); o.statusInk(null);
   o.goPage(false, { fade: true });
 }
+// the header: back closes the page; "my picks" reopens the last world Orbi grabbed
+$('.st-back').addEventListener('pointerdown', () => hap('tap'));
+$('.st-back').addEventListener('click', () => { if (['stage', 'ready'].includes(phase)) window.orbi?.goPage(false); });
+$('.st-pill').addEventListener('click', () => {
+  if (phase !== 'ready') return; hap('tap');
+  if (!lastPick) { speak('Nothing yet — press GRAB and I\'ll win you one! 🎯', { hold: 1800 }); return; }
+  const s = SETS.find((x) => x.id === lastPick);
+  phase = 'tx'; hush();
+  [...cards, ...ENTER()].forEach((el) => anim(el, [{ opacity: 1 }, { opacity: 0 }], { duration: 160, easing: EASE.out }));
+  setTimeout(() => { if (phase !== 'tx') return; C.loop = false; st.classList.remove('is-on'); discoverSet = s; disc.show(s, { fromFlood: false }); phase = 'discover'; window.orbi?.stage({ cx: 322, cy: 96, unit: 24 }); }, 170);
+});
+banEl.addEventListener('click', () => { if (phase === 'ready') { hap('tap'); window.orbi?.hop(1.2); speak('noon One members get 10% extra on my picks 💛', { hold: 2000 }); } });
 
-// ─── lifecycle: the page opens → intro (first time) or straight to the machine; it closes → everything resets
+// ─── lifecycle: the page opens → intro (first time) or straight to the stage; it closes → everything resets
 function reset() {
-  run++; looping = false; follow = false; phase = 'off';
-  clearInterval(bulbT); clearTimeout(sayHideT);
+  sayBelow = false;
+  run++; phase = 'off'; C.loop = false; Q.on = false; Q.follow = false;
+  clearTimeout(sayHideT);
   root.querySelectorAll('*').forEach((e) => e.getAnimations && e.getAnimations().forEach((a) => a.cancel()));
-  story.innerHTML = ''; say.textContent = ''; burst.innerHTML = ''; confetti.innerHTML = '';
-  cm.classList.remove('is-on'); prize.classList.remove('is-on'); expander.style.display = 'none';
-  prize.removeAttribute('style'); prize.querySelectorAll('*').forEach((e) => e.style && (e.style.opacity = ''));
-  coin.textContent = '×1'; grabBtn.disabled = true; grabBtn.classList.remove('is-ready', 'is-down');
+  story.innerHTML = ''; say.textContent = ''; burst.innerHTML = ''; confetti.innerHTML = ''; sparks.innerHTML = '';
+  st.classList.remove('is-on'); tx.classList.remove('is-on'); tx.querySelectorAll('.tx-card').forEach((e) => e.remove());
+  disc.hide({ instant: true }); expander.style.display = 'none';
+  Object.assign(C, { carriedEl: null, frozen: false, drag: null, spin: null, focus: -1 });
+  cards.forEach((c) => { c.style.visibility = ''; c.style.transformOrigin = ''; });
+  grabBtn.disabled = true; grabBtn.classList.remove('is-ready', 'is-down');
+  sheet.classList.remove('cx-dark');
   groundEl.innerHTML = ''; root.style.setProperty('--ink', '#1D2539'); window.orbi && window.orbi.statusInk(null);
   progress.forEach((p) => p.style.setProperty('--f', 0));
 }
@@ -508,22 +597,25 @@ async function start() {
   const r = run, o = window.orbi;
   if (!o) return;
   try {
-    const again = played && lastPick != null;
+    const again = played;
     if (!played) { await runIntro(r); if (!alive(r)) return; played = true; }
-    await showMachine(r, { again });
+    await showStage(r, { again });
   } catch {}
 }
 skipBtn.addEventListener('click', () => {
   if (phase !== 'intro') return;
   hap('tap'); played = true;
   const r = ++run; story.innerHTML = '';
-  showMachine(r).catch(() => {});
+  showStage(r).catch(() => {});
 });
 addEventListener('orbi:page', (e) => {
   if (e.detail === 'arrived') start();               // (the page has landed; Orbi finishes its turn meanwhile)
-  else if (e.detail === 'closing') { const o = window.orbi; o && (o.lock(false), o.stage(null), o.gazeAt(null), o.statusInk(null)); if (phase !== 'leave') { run++; phase = 'closing'; } }
+  else if (e.detail === 'closing') { const o = window.orbi; o && (o.lock(false), o.stage(null), o.gazeAt(null), o.statusInk(null)); if (phase !== 'leave') { run++; phase = 'closing'; C.loop = false; Q.on = false; } }
   else if (e.detail === 'closed') reset();
 });
-addEventListener('orbi:poke', () => { if (phase === 'ready') speak(['Hehe, that tickles!', 'Psst — press GRAB 👇', 'I\'m ready when you are!'][Math.floor(Math.random() * 3)], { hold: 1600 }); });
-addEventListener('resize', () => { if (cm.classList.contains('is-on')) layout(); });
-window.orbiClaw = { get phase() { return phase; }, start, reset, P, G, piles };
+addEventListener('orbi:poke', () => {
+  if (phase === 'ready') speak(['Hehe, that tickles!', 'Psst — press GRAB 👇', 'Swipe the cards — I\'ll pick one!'][Math.floor(Math.random() * 3)], { hold: 1600 });
+  else if (phase === 'discover') disc.poke();
+});
+addEventListener('resize', () => { if (st.classList.contains('is-on')) layoutStage(); });
+window.orbiClaw = { get phase() { return phase; }, start, reset, C, Q, L, disc, ORDER, get discoverSet() { return discoverSet; } };

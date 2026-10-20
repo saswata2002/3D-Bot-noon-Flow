@@ -1,6 +1,7 @@
 /* The claw machine's five card sets — real noon.com products (search results scraped 2026-10-20; photos are
    hotlinked from noon's CDN). Shared by the claw machine (claw/claw.js) and the GitFlow PLP it opens
-   (home-app/, built with these injected into the kit's catalogue: each set's `query` finds exactly its products). */
+   (home-app/, built with these injected into the kit's catalogue: each set's `query` finds exactly its products).
+   tint / accent are noon DS semantic pairs (success, info, noon One, danger, warning surface + ink). */
 export const SETS = [
  {
   "id": "gym",
@@ -8,8 +9,8 @@ export const SETS = [
   "emoji": "💪",
   "query": "gym essentials",
   "line": "Gains incoming!",
-  "tone": "#C6F432",
-  "ink": "#13210A",
+  "tint": "#E3FCF2",
+  "accent": "#0F8857",
   "products": [
    {
     "sku": "Z0AB24B92D88D38FB2FEDZ",
@@ -118,8 +119,8 @@ export const SETS = [
   "emoji": "⚡",
   "query": "audio & wearables",
   "line": "Ooh, shiny tech!",
-  "tone": "#5B8CFF",
-  "ink": "#0A1638",
+  "tint": "#EBF4FF",
+  "accent": "#0F61FF",
   "products": [
    {
     "sku": "N70008883V",
@@ -228,8 +229,8 @@ export const SETS = [
   "emoji": "✨",
   "query": "perfumes",
   "line": "Smells like a win!",
-  "tone": "#B98CFF",
-  "ink": "#1E0F3D",
+  "tint": "#FFF3C0",
+  "accent": "#794000",
   "products": [
    {
     "sku": "ZF23DE5EC51560ADE2D7EZ",
@@ -338,8 +339,8 @@ export const SETS = [
   "emoji": "🌸",
   "query": "skincare",
   "line": "Glow-up unlocked!",
-  "tone": "#FF8FB8",
-  "ink": "#3D0A1E",
+  "tint": "#FFF0F0",
+  "accent": "#DE1C1C",
   "products": [
    {
     "sku": "Z600367632FC83AD8C1F3Z",
@@ -448,8 +449,8 @@ export const SETS = [
   "emoji": "☕",
   "query": "kitchen appliances",
   "line": "Cosy home vibes!",
-  "tone": "#FFB547",
-  "ink": "#3A2200",
+  "tint": "#FFF1E0",
+  "accent": "#FF9741",
   "products": [
    {
     "sku": "N70213043V",

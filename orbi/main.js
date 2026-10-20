@@ -1553,8 +1553,9 @@ function placePage() {
   const pageTop = pageNav.fade ? 0 : Math.max(0, (1 - p) * SHEET.travel) + pageNav.lift;
   sheetEl.style.transform = `translateY(${pageTop.toFixed(2)}px)`;
   sheetEl.style.opacity = pageNav.fade ? THREE.MathUtils.clamp(p * 1.6 - 0.25, 0, 1).toFixed(3) : '';   // gone a little before Home is back
-  // the page is dark: light status-bar content once it's under the bar
-  if (sbar) sbar.style.setProperty('--sb-ink', THREE.MathUtils.clamp((46 - pageTop) / 30, 0, 1).toFixed(3) * (pageNav.fade ? THREE.MathUtils.clamp(p * 1.6 - 0.25, 0, 1) : 1));
+  // the status bar: dark content on the (light, noon DS) page; the page's content can ask for light content over a
+  // dark surface (orbi.statusInk), applied once the page is under the bar
+  if (sbar) sbar.style.setProperty('--sb-ink', (inkOverride != null && !pageNav.fade ? inkOverride * THREE.MathUtils.clamp((46 - pageTop) / 30, 0, 1) : 0).toFixed(3));
   frameView();
   const s = view.unit / 30;                                  // the Figma frame box (80 at unit 30)
   const pad = 16 * pc;                                       // on the sheet: room for the raised visor (it rises above the frame)
@@ -1634,7 +1635,7 @@ function restoreVisorNow() {
 // orbi.stage({ cx, cy, unit }, { snap }) — while the page is open and still, the bot goes there: on a soft spring
 // (ω 11, ζ .9), or glued to it every frame (`snap`, for riding the claw machine's carriage). orbi.stage(null)
 // hands it back to its rest spot. orbi.lock(true): a tap on it is a playful hop, not a spin/drag/carry.
-let stage = null, stageSnap = false, locked = false;
+let stage = null, stageSnap = false, locked = false, inkOverride = null;
 const stageV = { cx: 0, cy: 0, unit: 0 };
 function updateStage(dt) {
   if (!pageNav.open || pageNav.anim || pageNav.drag || pageNav.show) return;
@@ -2096,6 +2097,6 @@ requestAnimationFrame(frame);
 // small hook for automated checks
 window.orbi = {
   stage(t, { snap = false } = {}) { stage = t ? { cx: t.cx, cy: t.cy, unit: t.unit } : null; stageSnap = !!(t && snap); },
-  lock(on) { locked = !!on; }, gazeAt(yaw, pitch) { gazeLock = yaw == null ? null : { yaw, pitch }; }, hop,
+  lock(on) { locked = !!on; }, statusInk(v) { inkOverride = v == null ? null : +v; placePage(); }, gazeAt(yaw, pitch) { gazeLock = yaw == null ? null : { yaw, pitch }; }, hop,
   get pageOpen() { return pageNav.open; },
   gov: GOV, tilt, restoreBot, carry, look, pageNav, get dozed() { return dozed; }, poke, goPage, view, setState, nudge, cycleColour, get theme() { return THEMES[themeIdx].name; }, helmet, toggleVisor, advance: update, faceCanvas, intro, gaze, replay: () => { setState('idle', { quiet: true }); helmet.setVisorDown(false); syncVisor(); Object.assign(intro, { active: true, t: 0, scale: 0, greeted: false, popped: false }); }, get state() { return state; }, motion: m, bodyUniforms: uniforms, bodyMat, renderer, scene, camera };

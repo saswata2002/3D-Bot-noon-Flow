@@ -134,7 +134,7 @@ export function mountStory(ctx) {
       async play(el, { sw }, o, d) {
         el.querySelectorAll('.ws-dots').forEach((g, i) => anim(g, [{ transform: `translateY(${i ? 30 : -30}px)`, opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: MOVE.ms, easing: EASE.move }));
         rise([...el.querySelectorAll('.ws-copy > *')], { d0: 100 });
-        await sw(1350);
+        await sw(1100);
         anim(el.querySelector('.ws-copy'), [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-30px)' }], { duration: 420, easing: EASE.out });
         // "You saved", then the plaque drops in (MOVE) and its reels spin up and land left → right
         rise([el.querySelector('.ws-kick')], { d0: 260, y: 20 });
@@ -143,7 +143,7 @@ export function mountStory(ctx) {
         const reels = [...el.querySelectorAll('.ws-reel')], CELL = 92;
         let last = 0;
         reels.forEach((rl, i) => {
-          const strip = rl.firstElementChild, to = +rl.dataset.to * CELL, ms = reduce.matches ? 300 : 1500 + i * 360, dl = 640 + i * 90;
+          const strip = rl.firstElementChild, to = +rl.dataset.to * CELL, ms = reduce.matches ? 300 : 1250 + i * 260, dl = 540 + i * 90;
           // a long decelerating spin a touch past the digit, then a springy settle back onto it
           anim(strip, [{ transform: 'translateY(0)', easing: 'cubic-bezier(.12,.55,.18,1)' }, { transform: `translateY(${-to - 16}px)`, offset: 0.86, easing: 'cubic-bezier(.3,1.4,.5,1)' }, { transform: `translateY(${-to}px)` }],
             { duration: ms, delay: dl, easing: 'linear' });
@@ -162,7 +162,7 @@ export function mountStory(ctx) {
           }));
         }, last - 120);
         rise([...el.querySelectorAll('.ws-cap > *')], { d0: last - 300, y: 16 });
-        await sw(last + 1300);
+        await sw(last + 950);
       } },
     { id: 'curating', dark: true, ms: 1900, final: true,
       html: (d) => `<div class="ws-radar">${'<i></i>'.repeat(4)}</div>

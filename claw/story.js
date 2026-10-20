@@ -115,36 +115,54 @@ export function mountStory(ctx) {
         rise([...el.querySelectorAll('.ws-cap > *')], { d0: 700, y: 18, gap: 90 });
         await sw(1900);
       } },
-    { id: 'saved', dark: false, ms: 2700,
+    { id: 'saved', dark: false, ms: 4200,
       html: (d) => {
-        const dots = (n) => Array.from({ length: n }, (_, r) => `<div class="ws-row${r % 2 ? ' o' : ''}">${'<i></i>'.repeat(7)}</div>`).join('');
-        const amt = `<span>AED <em>0</em></span>`;
-        return `<div class="ws-dots t">${dots(3)}</div><div class="ws-dots b">${dots(3)}</div>
+        const dots = (n) => Array.from({ length: n }, (_, r) => `<div class="ws-row${r % 2 ? ' o' : ''}">${'<i></i>'.repeat(9)}</div>`).join('');
+        // the amount as slot-machine reels: one reel per digit, each strip spins whole turns and lands on its digit
+        const chars = fmt(d.SAVED).split(''); let ri = 0;
+        const reels = chars.map((ch) => {
+          if (ch === ',') return '<b class="ws-comma">,</b>';
+          const turns = 2 + ri++, cells = Array.from({ length: turns * 10 + +ch + 1 }, (_, k) => `<i>${k % 10}</i>`).join('');
+          return `<div class="ws-reel" data-to="${turns * 10 + +ch}"><div class="ws-strip">${cells}</div></div>`;
+        }).join('');
+        return `<div class="ws-dots t">${dots(2)}</div><div class="ws-dots b">${dots(2)}</div>
         <div class="ws-copy"><div class="ws-h">Every deal<br>adds up.</div></div>
         <div class="ws-kick">You saved</div>
-        <div class="ws-marq"><div class="ws-track">${amt}${amt}${amt}${amt}</div></div>
+        <div class="ws-slot"><span class="ws-cur">AED</span>${reels}</div>
         <div class="ws-cap s"><div class="ws-s">on deals, coupons &amp; noon One 🎉</div></div>`;
       },
       async play(el, { sw }, o, d) {
+        el.querySelectorAll('.ws-dots').forEach((g, i) => anim(g, [{ transform: `translateY(${i ? 30 : -30}px)`, opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: MOVE.ms, easing: EASE.move }));
         rise([...el.querySelectorAll('.ws-copy > *')], { d0: 100 });
-        // the dots ripple into yellow dashes, column by column (the reference's red dashes)
-        const rows = [...el.querySelectorAll('.ws-row')];
-        rows.forEach((row, ri) => [...row.children].forEach((dot, ci) => {
-          anim(dot, [{ transform: 'scale(1)', background: '#0E0E0E' }, { transform: 'scale(1.75, .4)', background: '#FEEE00', offset: 0.45 }, { transform: 'scale(1.75, .4)', background: '#FEEE00', offset: 0.7 }, { transform: 'scale(1)', background: '#0E0E0E' }],
-            { duration: 1900, easing: 'cubic-bezier(.65,0,.35,1)', delay: 300 + ci * 90 + (ri % 3) * 50 });
-        }));
-        el.querySelectorAll('.ws-dots').forEach((g, i) => anim(g, [{ transform: `translateY(${i ? 40 : -40}px)`, opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: MOVE.ms, easing: EASE.move }));
         await sw(1350);
         anim(el.querySelector('.ws-copy'), [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-30px)' }], { duration: 420, easing: EASE.out });
-        // "You saved" and the amount as a marquee band (the reference's "listening age" ticker)
+        // "You saved", then the plaque drops in (MOVE) and its reels spin up and land left → right
         rise([el.querySelector('.ws-kick')], { d0: 260, y: 20 });
-        const marq = el.querySelector('.ws-marq'), track = el.querySelector('.ws-track');
-        anim(marq, [{ transform: 'translateX(60%)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 1100, easing: SOFT, delay: 300 });
-        track.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-50%)' }], { duration: 5200, iterations: Infinity, easing: 'linear' });
-        countUp([...el.querySelectorAll('.ws-track em')], d.SAVED, 1100);
-        setTimeout(() => { hap('success'); o.hop(1.6); }, 1000);
-        rise([...el.querySelectorAll('.ws-cap > *')], { d0: 760, y: 16 });
-        await sw(2100);
+        const slot = el.querySelector('.ws-slot');
+        anim(slot, [{ transform: 'translateY(34px) rotate(-3deg)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 900, easing: SOFT, delay: 360 });
+        const reels = [...el.querySelectorAll('.ws-reel')], CELL = 92;
+        let last = 0;
+        reels.forEach((rl, i) => {
+          const strip = rl.firstElementChild, to = +rl.dataset.to * CELL, ms = reduce.matches ? 300 : 1500 + i * 360, dl = 640 + i * 90;
+          // a long decelerating spin a touch past the digit, then a springy settle back onto it
+          anim(strip, [{ transform: 'translateY(0)', easing: 'cubic-bezier(.12,.55,.18,1)' }, { transform: `translateY(${-to - 16}px)`, offset: 0.86, easing: 'cubic-bezier(.3,1.4,.5,1)' }, { transform: `translateY(${-to}px)` }],
+            { duration: ms, delay: dl, easing: 'linear' });
+          // motion blur while it's fast
+          anim(strip, [{ filter: 'blur(0px)' }, { filter: 'blur(2.6px)', offset: 0.12 }, { filter: 'blur(2.2px)', offset: 0.5 }, { filter: 'blur(0px)', offset: 0.82 }], { duration: ms, delay: dl, easing: 'linear' });
+          setTimeout(() => { hap('tick'); anim(rl, [{ transform: 'translateY(0)' }, { transform: 'translateY(3px)', offset: 0.4 }, { transform: 'none' }], { duration: 260, easing: 'cubic-bezier(.3,1.5,.5,1)' }); }, dl + ms * 0.86);
+          last = Math.max(last, dl + ms);
+        });
+        // the jackpot: the plaque pops, the dots ripple into yellow dashes, the bot hops
+        setTimeout(() => {
+          hap('success'); o.hop(1.6);
+          anim(slot, [{ transform: 'none' }, { transform: 'scale(1.05) rotate(1.5deg)', offset: 0.35 }, { transform: 'none' }], { duration: 620, easing: EASE.pop });
+          [...el.querySelectorAll('.ws-row')].forEach((row, ri) => [...row.children].forEach((dot, ci) => {
+            anim(dot, [{ transform: 'scale(1)', background: '#0E0E0E' }, { transform: 'scale(1.8, .42)', background: '#FEEE00', offset: 0.4 }, { transform: 'scale(1.8, .42)', background: '#FEEE00', offset: 0.75 }, { transform: 'scale(1)', background: '#0E0E0E' }],
+              { duration: 1500, easing: 'cubic-bezier(.65,0,.35,1)', delay: ci * 55 + (ri % 2) * 40 });
+          }));
+        }, last - 120);
+        rise([...el.querySelectorAll('.ws-cap > *')], { d0: last - 300, y: 16 });
+        await sw(last + 1300);
       } },
     { id: 'curating', dark: true, ms: 1900, final: true,
       html: (d) => `<div class="ws-radar">${'<i></i>'.repeat(4)}</div>

@@ -221,3 +221,40 @@
 .dv-art .mc-ins { border-radius: 0 0 36px 36px; top: -40px; }
 .dv-intro { position: relative; padding: 22px 22px 0; }
 .dv-intro .dv-lede { max-width: 262px; color: rgba(255,255,255,.78); }
+
+/* ══ the landing page, 1:1 with Figma Sas-Motion 309:49973 "01 – Landing Page (Trigger)" ══ */
+.st { background: transparent; color: #270A71; }
+.lp-bg { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, #F7F5FF 60.687%, #FFFFFF 106.84%); }
+.lp-grid { position: absolute; inset: 0; background-image: url('art/lp/grid.svg'); background-size: 375px 812px; background-position: 50% 0; }
+.lp-dots { position: absolute; left: 58.29px; top: 36.32px; width: 280.45px; height: 106px; background: url('art/lp/dots.svg') no-repeat 0 0 / 100% 100%; }
+.st-back.lp-icon { left: 16px; top: 55px; width: 36px; height: 36px; border-radius: 18px; background: #F5F0FF; box-shadow: inset 0 0 0 1px rgba(177, 147, 255, .5); }
+.st-back.lp-icon svg { width: 20px; height: 20px; fill: none; stroke: #270A71; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.st-back.lp-icon:active { background: #ECE4FF; }
+/* the coupon: 244 × 325, r 23.23, a 214.9-tall #A696FF banner, the offer below, a lavender stroke */
+.st-card.lp-card { width: 244px; height: 325px; margin-left: -122px; border-radius: 23.234px; background: #FFFFFF; box-shadow: none; }
+.st-car { height: 340px; }
+.st-card.lp-card::before, .st-card.lp-card::after, .tx-card .tx-front::after { display: none; }
+.lp-ban { position: absolute; left: 0; top: 0; width: 244px; height: 214.9px; overflow: hidden; background: #A696FF; }
+.lp-art { --k: 1.4788; left: 0 !important; top: -54px !important; }
+.lp-offer { position: absolute; left: 50%; bottom: 0; width: 203.3px; height: 110.36px; margin-left: -101.65px; text-align: center; color: #270A71; letter-spacing: -0.155px; }
+.lp-offer p { position: absolute; left: 0; right: 0; margin: 0; white-space: nowrap; }
+.lp-offer .l1 { top: 23.96px; font: 600 20.33px/31.01px var(--noon); opacity: .8; }
+.lp-offer .l2 { top: 57.36px; font: 700 23.234px/31.01px var(--noon); }
+.lp-stroke { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 3; background: url('art/lp/stroke.svg') no-repeat 0 0 / 100% 100%; }
+.tx-card { width: 244px; height: 325px; border-radius: 23.234px; }
+.tx-card .tx-front { background: #FFFFFF; border: 0; }
+/* the copy block and the CTA (H20 Bold #270A71 · B14 Medium #57559B · M-PrimaryButton H52 r12 #270A71, A16 SemiBold) */
+.lp-copy { position: absolute; left: 50%; top: var(--ty, 582.7px); width: 316px; margin-left: -158px; text-align: center; }
+.lp-copy h2 { margin: 0; font: 700 20px/28px var(--noon); letter-spacing: -0.25px; color: #270A71; }
+.lp-copy p { margin: 6px 0 0; font: 500 14px/20px var(--noon); letter-spacing: -0.1px; color: #57559B; }
+.st-grab.lp-cta { left: 24px; width: 327px; height: 52px; margin-left: 0; top: var(--by, 670.7px); border-radius: 12px; background: #270A71;
+  transition: transform .12s cubic-bezier(.32,.72,0,1), background-color .2s; }
+.st-grab.lp-cta::before { display: none; }
+.st-grab.lp-cta span { position: static; display: block; height: 52px; border-radius: 0; background: none; box-shadow: none; transform: none !important; animation: none !important;
+  font: 600 16px/52px var(--noon); letter-spacing: 0; color: #FFFFFF; text-align: center; }
+.st-grab.lp-cta.is-down { transform: scale(.98); background: #1C0757; }
+/* (stand-ins until the Figma grid / dots / stroke SVGs are exported into art/lp) */
+.lp-grid { background-image: linear-gradient(rgba(166,150,255,.14) 1px, transparent 1px), linear-gradient(90deg, rgba(166,150,255,.14) 1px, transparent 1px); background-size: 32.7px 32.7px; background-position: -6px 0; }
+.lp-dots { background: radial-gradient(circle at 264.6px 13.1px, #C9BCFF 4.05px, transparent 4.6px), radial-gradient(circle at 277.4px 90.6px, #C9BCFF 3.05px, transparent 3.6px),
+  radial-gradient(circle at 2.3px 103.7px, #C9BCFF 2px, transparent 2.5px), radial-gradient(circle at 43px 5.2px, #C9BCFF 4.87px, transparent 5.4px); }
+.lp-stroke { background: none; box-shadow: inset 0 0 0 1.6px #CBBEFF; }

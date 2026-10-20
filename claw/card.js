@@ -39,3 +39,18 @@ export function cardArt(s) {
     <img class="mc-glow" src="${A}glow.svg" alt="" draggable="false">
     <div class="mc-head"><b>${s.name}</b><span class="mc-pill">Up to <em>${s.best}%</em> off</span></div></div><i class="mc-ins"></i>`;
 }
+
+// the landing page's coupon (Figma 309:49973 "Coupon": 244 × 325, white, a 215-tall lavender banner, the offer
+// under it). The banner shows the world's two products bursting up from its bottom edge, over the ref's glow and
+// sparkles; the offer reads "N% off up to" / "<dirham> cap" (Noontree carries the dirham at U+E001).
+const CAP = { tech: 150, gym: 100, scents: 100, glow: 75, home: 200 };
+export const couponOf = (s) => ({ pct: Math.min(15, Math.max(10, Math.round(s.best / 6))), cap: CAP[s.id] || 100 });
+export function couponArt(s) {
+  const c = CARD[s.id], { pct, cap } = couponOf(s), [sx, sy, sw, sr] = c.star;
+  return `<div class="lp-ban"><div class="mc lp-art"><img class="mc-mask" src="${A}mask.svg" alt="" draggable="false">
+      <img class="mc-spark" src="${A}sparkles.svg" alt="" draggable="false">
+      ${prod(c.back, 'back')}${prod(c.front, 'front')}
+      <img class="mc-star" src="${A}star.webp" alt="" draggable="false" style="left:${sx}px;top:${sy}px;width:${sw}px;transform:translate(-50%,-50%) rotate(${sr}deg)">
+      <img class="mc-glow" src="${A}glow.svg" alt="" draggable="false"></div></div>
+    <div class="lp-offer"><p class="l1">${pct}% off up to</p><p class="l2">\uE001${cap}</p></div><i class="lp-stroke"></i>`;
+}

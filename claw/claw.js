@@ -14,7 +14,7 @@
 import { SETS } from './catalog.js';
 import { mountDiscover } from './discover.js';
 import { mountStory } from './story.js';
-import { CARD, cardArt, cardVars } from './card.js';
+import { CARD, cardArt, cardVars, couponArt } from './card.js';
 
 // ─── who it's for: a 2026 order history (demo data) and what it adds up to ──────────────────────────────
 const USER = { name: 'Saswata' };
@@ -66,20 +66,18 @@ const sheet = document.getElementById('orbiSheet');
 const root = document.createElement('div');
 root.className = 'cx';
 const CLAW_SVG = `<svg viewBox="0 0 64 56" aria-hidden="true">
-  <g class="pr" data-k="-1"><path d="M28 14 C18 22 12 34 16 50" fill="none" stroke="#d6d9e0" stroke-width="5" stroke-linecap="round"/><circle cx="16" cy="50" r="3.5" fill="#ffd23c"/></g>
-  <g class="pr" data-k="1"><path d="M36 14 C46 22 52 34 48 50" fill="none" stroke="#d6d9e0" stroke-width="5" stroke-linecap="round"/><circle cx="48" cy="50" r="3.5" fill="#ffd23c"/></g>
+  <g class="pr" data-k="-1"><path d="M28 14 C18 22 12 34 16 50" fill="none" stroke="#7C6FD0" stroke-width="5" stroke-linecap="round"/><circle cx="16" cy="50" r="3.5" fill="#ffd23c"/></g>
+  <g class="pr" data-k="1"><path d="M36 14 C46 22 52 34 48 50" fill="none" stroke="#7C6FD0" stroke-width="5" stroke-linecap="round"/><circle cx="48" cy="50" r="3.5" fill="#ffd23c"/></g>
   <rect x="20" y="2" width="24" height="16" rx="6" fill="#ffd23c"/><rect x="24" y="7" width="16" height="4" rx="2" fill="#7a3e00" opacity=".4"/></svg>`;
 root.innerHTML = `
   <div class="cx-ground"></div>
   <div class="cx-story" data-no-drag></div>
   <div class="st">
-    <div class="st-glow"></div>
-    <button class="st-back" type="button" aria-label="Close"><svg viewBox="0 0 30 20" aria-hidden="true"><path d="M29 10H2M10 2L2 10l8 8"/></svg></button>
+    <div class="lp-bg"><i class="lp-grid"></i><i class="lp-dots"></i></div>
+    <button class="st-back lp-icon" type="button" aria-label="Close"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M12.5 15l-5-5 5-5"/></svg></button>
     <div class="st-car" data-no-drag></div>
-    <div class="st-floor"></div>
-    <div class="st-pager">${'<i></i>'.repeat(5)}</div>
-    <div class="st-plinth"></div>
-    <button class="st-grab" type="button" aria-label="Grab a deal"><i></i><span>GRAB</span></button>
+    <div class="lp-copy"><h2>Unlock your rewards</h2><p>Swipe through the deals, then hit Grab.</p></div>
+    <button class="st-grab lp-cta" type="button" aria-label="Grab a deal"><span>Grab</span></button>
     <div class="st-cable"></div><div class="st-claw">${CLAW_SVG}</div>
   </div>
   <div class="tx"><div class="tx-flood"></div><div class="tx-rays"></div><div class="tx-spark"></div></div>
@@ -93,7 +91,7 @@ const story = $('.cx-story'), progress = [];                         // (no stor
 const say = $('.cx-say'), burst = $('.cx-burst'), confetti = $('.cx-confetti');
 const groundEl = $('.cx-ground');
 const st = $('.st'), car = $('.st-car');
-const grabBtn = $('.st-grab'), pagerEl = $('.st-pager'), floorEl = $('.st-floor'), dots = [...pagerEl.children];
+const grabBtn = $('.st-grab'), copyEl = $('.lp-copy'), lpBg = $('.lp-bg');
 const cableEl = $('.st-cable'), clawEl = $('.st-claw'), prongs = [...clawEl.querySelectorAll('.pr')];
 const tx = $('.tx'), flood = $('.tx-flood'), rays = $('.tx-rays'), sparks = $('.tx-spark');
 const expander = document.createElement('div');                 // the hand-off layer out to noon's PLP
@@ -153,7 +151,7 @@ function placeSay() {
 }
 
 // ─── 1 · the story: four Wrapped-style beats (claw/story.js) ───────────────────────────────────────────
-const cardHTML = (s, i) => `<div class="st-card mc-card" data-i="${i}" style="${cardVars(s)}">${cardArt(s)}<i class="c-dim"></i></div>`;
+const cardHTML = (s, i) => `<div class="st-card lp-card" data-i="${i}" style="${cardVars(s)}">${couponArt(s)}<i class="c-dim"></i></div>`;
 const storyMod = mountStory({
   story, progress, anim, EASE, MOVE, hap, reduce,
   ink: (dark) => { root.style.setProperty('--ink', dark ? '#F1EFE6' : '#0E0E0E'); window.orbi && window.orbi.statusInk(dark ? 1 : null); },
@@ -178,16 +176,14 @@ async function runIntro(r) {
 car.innerHTML = ORDER.map(cardHTML).join('');
 const cards = [...car.querySelectorAll('.st-card')];
 const L = { H: 0, cy: 0, k: 1, hh: 150 };
-const CW = 200, CH = 230, SPREAD = 200, FAR = 96;                       // card size, neighbour offset, far offset
-const ORBI_HOME = () => ({ cx: 322, cy: 84, unit: 22 });              // top right, level with the back arrow
+const CW = 244, CH = 325, SPREAD = 242.5, FAR = 212;                    // Figma: 244 × 325 coupon, 183 × 244 neighbours, 29 gap
+const ORBI_HOME = () => ({ cx: 187.5, cy: Math.round((100 + L.cy) / 2), unit: 22 });   // top centre, between the header and the cards
 function layoutStage() {
-  // a quiet header, then the carousel centred between it and the GRAB plinth (the page is the cards)
+  // Figma 309:49973 at 812: cards 201.7, title 582.7, CTA 670.7 (52 tall); shorter screens tighten the gaps
   const Hh = sheet.clientHeight, k = clamp((Hh - 691) / (812 - 691), 0, 1);
-  const hh = lerp(136, 150, k), bl = Hh - lerp(176, 190, k), by = bl + 8;
-  const cy = Math.round((hh + bl) / 2 - CH / 2 - lerp(14, 22, k));
-  const fy = cy + CH - 26, gy = cy + CH + lerp(30, 40, k);
-  Object.assign(L, { H: Hh, k, cy, hh, ch: CH });
-  for (const [n, x] of Object.entries({ hh, bl, by, cy, fy, gy })) st.style.setProperty(`--${n}`, `${x.toFixed(1)}px`);
+  const by = Math.round(Hh - lerp(92, 141.3, k)), ty = by - 88, cy = Math.round(ty - lerp(30, 55.7, k) - CH);
+  Object.assign(L, { H: Hh, k, cy, hh: 100, ch: CH });
+  for (const [n, x] of Object.entries({ by, ty, cy })) st.style.setProperty(`--${n}`, `${x.toFixed(1)}px`);
 }
 
 // the carousel: `pos` is a float card index; every card is placed from its offset to it (a coverflow)
@@ -199,11 +195,11 @@ function poseOf(i, pos, s = 1) {
   let d = i - pos; d = ((d % N) + N + N / 2) % N - N / 2;              // −2.5 … 2.5
   const ad = Math.abs(d), s1 = Math.min(ad, 1);
   const x = Math.sign(d) * (ad <= 1 ? ad * SPREAD : SPREAD + (ad - 1) * FAR);
-  const rot = clamp(d, -1, 1) * 42, z = -s1 * 80 - Math.max(0, ad - 1) * 60, sc = 1 - s1 * 0.12;
+  const sc = 1 - s1 * 0.25;
   const op = ad > 1.5 ? Math.max(0, 1 - (ad - 1.5) * 2.4) : 1;
   return {
-    transform: `translate3d(${(x * s).toFixed(2)}px, 0, ${(z * s).toFixed(1)}px) rotateZ(${((1 - s) * STACK_RZ[i]).toFixed(2)}deg) rotateY(${(rot * s).toFixed(2)}deg) scale(${lerp(0.62, sc, s).toFixed(4)})`,
-    opacity: lerp(1, op, clamp(s * 1.6 - 0.3, 0, 1)), dim: s1 * 0.38 * s, z: 10 - Math.round(ad * 2), sheen: d * 70 * s,
+    transform: `translate3d(${(x * s).toFixed(2)}px, 0, 0) rotateZ(${((1 - s) * STACK_RZ[i]).toFixed(2)}deg) scale(${lerp(0.62, sc, s).toFixed(4)})`,
+    opacity: lerp(1, op, clamp(s * 1.6 - 0.3, 0, 1)), dim: 0, z: 10 - Math.round(ad * 2), sheen: 0,
   };
 }
 function placeCards() {
@@ -251,11 +247,7 @@ function stageTick(now) {
   requestAnimationFrame(stageTick);
 }
 // the focused world: its dot in the pager, its colour in the glow on the floor under the cards
-function showInfo(s) {
-  const i = ORDER.indexOf(s);
-  dots.forEach((d, k) => d.classList.toggle('on', k === i));
-  floorEl.style.color = s.glow;
-}
+function showInfo() {}
 // drag / flick / tap the carousel
 car.addEventListener('pointerdown', (e) => {
   if (phase !== 'ready') return;
@@ -294,12 +286,12 @@ const spinTo = (to, ms) => new Promise((res) => { C.spin = { from: C.pos, to, t0
 
 // the stage comes in: the navy of the last beat deepens to the stage's black, the glows bloom, the headline
 // rises, the cards sweep in from the right, the controls follow (60 ms stagger)
-const ENTER = () => [floorEl, pagerEl, $('.st-plinth'), grabBtn, $('.st-back')];
+const ENTER = () => [copyEl, grabBtn, $('.st-back')];
 async function showStage(r, { again = false, fromStory = null } = {}) {
   phase = 'stage';
   const o = window.orbi;
   root.classList.remove('is-intro'); sheet.classList.add('cx-dark');
-  ground('#050506', '#FFFFFF', true);
+  ground('#F7F5FF', '#270A71', false);
   o.setState('idle');
   layoutStage();
   st.getAnimations({ subtree: true }).forEach((a) => a.cancel());
@@ -313,6 +305,7 @@ async function showStage(r, { again = false, fromStory = null } = {}) {
     // the stage takes over the last beat in place: the same black, the same cards in the same pose; the beat's
     // words go and its radar blooms out under the stage (see-through until the beat is gone)
     st.style.background = 'transparent';
+    anim(lpBg, [{ opacity: 0 }, { opacity: 1 }], { duration: 760, easing: EASE.out });   // (the light page comes up over the story's black)
     storyMod.leave(fromStory);
     const end = fromStory;
     setTimeout(() => { end.remove(); st.style.background = ''; }, 900);
@@ -320,14 +313,14 @@ async function showStage(r, { again = false, fromStory = null } = {}) {
   }
   st.classList.add('is-on');
   C.loop = true; C.last = 0; requestAnimationFrame(stageTick);
-  anim($('.st-glow'), [{ opacity: 0 }, { opacity: 1 }], { duration: 400, easing: EASE.out });
+  if (!fromStory) anim(lpBg, [{ opacity: 0 }, { opacity: 1 }], { duration: 400, easing: EASE.out });
   ENTER().forEach((el, i) => {
     anim(el, [{ transform: 'translateY(22px)' }, { transform: 'none' }], { duration: MOVE.ms, easing: EASE.move, delay: 60 + i * 40 });
     anim(el, [{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: EASE.in, delay: 60 + i * 40 });
   });
   setTimeout(() => alive(r) && hap('land', 0.5), 260);
   // Orbi settles into the header, where it operates the claw from
-  o.stage(ORBI_HOME()); o.gazeAt(-0.3, 0.3); sayBelow = true;
+  o.stage(ORBI_HOME()); o.gazeAt(0, 0.42); sayBelow = true;          // (it watches the cards from above)
   await wait(again ? 420 : 620, r);
   o.lock(true);
   speak(again ? 'Back for another round? 🎰' : 'Swipe the worlds, then hit GRAB 👇', { hold: again ? 1800 : 3000 });
@@ -396,7 +389,7 @@ async function grab(r) {
   const card = cards[ti];
   anim(card, [{ transform: card.style.transform }, { transform: `${card.style.transform} scale(1.06)`, offset: 0.35 }, { transform: card.style.transform }], { duration: 420, easing: EASE.pop });
   // Orbi flies over the card
-  const y0 = Math.max(96, L.cy - 132);
+  const y0 = Math.max(70, L.cy - 112);
   o.stage({ cx: 187.5, cy: y0, unit: 22 });
   await until(() => Math.abs(o.view.cy - y0) < 3 && Math.abs(o.view.cx - 187.5) < 3, r, 900);
   // the claw drops out of Orbi: prongs open on the way down, close on the card's top edge
@@ -416,7 +409,7 @@ async function grab(r) {
     const m = new DOMMatrix(getComputedStyle(c).transform), side = m.m41 < 0 ? -1 : 1;
     anim(c, [{ transform: c.style.transform, opacity: +c.style.opacity || 1 }, { transform: `${c.style.transform} translate3d(${side * 30}px, 520px, 0) rotateZ(${side * (14 + i * 4)}deg)`, opacity: 0 }], { duration: 620, easing: EASE.fall, delay: i * 25 });
   });
-  [floorEl, pagerEl, $('.st-plinth'), grabBtn].forEach((el, i) => anim(el, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(26px)' }], { duration: 200, easing: EASE.out, delay: i * 25 }));
+  [copyEl, grabBtn].forEach((el, i) => anim(el, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(26px)' }], { duration: 200, easing: EASE.out, delay: i * 25 }));
   setTimeout(() => alive(r) && hap('land', 0.4), 420);
   Q.ty = y0 - 26; Q.tx = 187.5 + 18; Q.Lt = Math.max(30, Q.L - 52);
   await wait(240, r); Q.tx = 187.5;

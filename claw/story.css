@@ -1,7 +1,8 @@
 /* ══ Orbi's Claw — the story beats (claw/story.js), after the Spotify Wrapped 2025 reference: paper #F1EFE6 and
    ink #0E0E0E, op-art rings and dot grids, huge extended numerals (Unbounded 900) in noon yellow with an ink
    outline, hand-drawn lines; noon type (Noontree) for the words. ══ */
-.ws { position: absolute; inset: 0; overflow: hidden; background: #F1EFE6; color: #0E0E0E; will-change: transform; contain: layout paint; }
+.ws { position: absolute; inset: 0; overflow: hidden; background: #F1EFE6; color: #0E0E0E; will-change: transform; contain: layout paint;
+  box-shadow: 0 -24px 48px rgba(0, 0, 0, .28); }   /* (the next beat slides over the last: a soft edge between them) */
 .ws.dark { background: #0E0E0E; color: #F1EFE6; }
 .ws-curating.dark { background: #050506; }
 .ws-copy { position: absolute; left: 24px; right: 24px; top: 40%; text-align: center; z-index: 1; }
@@ -32,7 +33,7 @@
 .ws-corner { position: absolute; left: -230px; bottom: -290px; width: 540px; height: 540px; will-change: rotate, scale; }
 .ws-orders .ws-copy { top: 38%; }
 .ws-num { position: absolute; left: 0; right: 0; top: 30%; text-align: center; pointer-events: none; }
-.ws-num b { display: inline-block; font-size: 210px; line-height: 220px; transform: translateX(-140%); text-shadow: 8px 8px 0 #5E5600; }
+.ws-num b { display: inline-block; font-size: 210px; line-height: 220px; transform: translateX(-460px); opacity: 0; text-shadow: 8px 8px 0 #5E5600; }   /* (off-screen and hidden until it slams in: the narrow "0" would peek) */
 .ws-cap { position: absolute; left: 24px; right: 24px; top: calc(30% + 228px); text-align: center; z-index: 2; }
 .ws-cap > *, .ws-kick, .ws-marq { opacity: 0; }
 

@@ -8,8 +8,9 @@
      3 · curating  — ink: "Curating offers for you…" while the five worlds' cards riffle in a stack, radar rings
                      pulsing; the stack sits exactly where the carousel's cards will be, so the stage can spread
                      it straight into the carousel (claw.js showStage({ fromStory }))
-   Between beats: a full-screen vertical push (the reference's cut), 520 ms in-out cubic, the incoming content
-   settling on the MOVE spring. A tap jumps to the next beat. ══ */
+   Between beats: a full-screen vertical push (the reference's cut), 950 ms on a soft in-out (0.7, 0, 0.2, 1) —
+   the next beat slides over the last, which drifts up at a third of the speed; its content starts once the
+   push is under way and settles on the MOVE spring. A tap jumps to the next beat. ══ */
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 // checker rings (op-art): ring widths grow outward (a tunnel), alternate rings offset by half a cell
@@ -41,6 +42,7 @@ const squiggle = (i, col) => `<svg class="ws-line" viewBox="0 0 375 140" preserv
 
 export function mountStory(ctx) {
   const { story, progress, anim, EASE, MOVE, hap, reduce } = ctx;
+  const PUSH = 950, SOFT = 'cubic-bezier(0.7, 0, 0.2, 1)';            // the cuts and the big moves: slow in, long soft landing
   let cur = null;                         // the beat on screen: { skip() }
   story.addEventListener('click', () => { if (cur && cur.skip) cur.skip(); });
   const fmt = (n) => n.toLocaleString('en-US');
@@ -75,22 +77,22 @@ export function mountStory(ctx) {
       async play(el, { sw }, o) {
         const halves = [...el.querySelectorAll('.ws-half')], rings = [...el.querySelectorAll('.ws-rings')], year = el.querySelector('.ws-year');
         rings.forEach((g) => { spin(g, 360, 26000); anim(g, [{ scale: '1.35' }, { scale: '1' }], { duration: 1400, easing: 'cubic-bezier(.2,.7,.2,1)' }); });
-        anim(year, [{ transform: 'translateX(70%)' }, { transform: 'none' }], { duration: 760, easing: EASE.move });
+        anim(year, [{ transform: 'translateX(70%)' }, { transform: 'none' }], { duration: 1000, easing: SOFT });
         anim(year, [{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: EASE.in });
         setTimeout(() => hap('tick'), 120);
-        await sw(780);
+        await sw(1050);
         // the year flies out left, the rings part like a curtain onto paper
-        anim(year, [{ transform: 'none' }, { transform: 'translateX(-130%)' }], { duration: 320, easing: 'cubic-bezier(.55,0,.75,.2)' });
-        await sw(140);
-        anim(halves[0], [{ transform: 'none' }, { transform: 'translateY(-101%)' }], { duration: 560, easing: EASE.expand });
-        anim(halves[1], [{ transform: 'none' }, { transform: 'translateY(101%)' }], { duration: 560, easing: EASE.expand });
+        anim(year, [{ transform: 'none' }, { transform: 'translateX(-130%)' }], { duration: 520, easing: 'cubic-bezier(.5,0,.75,0)' });
+        await sw(220);
+        anim(halves[0], [{ transform: 'none' }, { transform: 'translateY(-101%)' }], { duration: 950, easing: SOFT });
+        anim(halves[1], [{ transform: 'none' }, { transform: 'translateY(101%)' }], { duration: 950, easing: SOFT });
         hap('snap');
-        rise([...el.querySelectorAll('.ws-copy > *')], { d0: 160 });
-        anim(el.querySelector('.ws-band'), [{ transform: 'translateY(100%)' }, { transform: 'none' }], { duration: MOVE.ms + 200, easing: EASE.move, delay: 260 });
+        rise([...el.querySelectorAll('.ws-copy > *')], { d0: 380, gap: 90 });
+        anim(el.querySelector('.ws-band'), [{ transform: 'translateY(100%)' }, { transform: 'none' }], { duration: 1000, easing: SOFT, delay: 420 });
         el.querySelector('.ws-btrack').animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-50%)' }], { duration: 7000, iterations: Infinity, easing: 'linear' });
-        drawLine(el.querySelector('.ws-line'), 1000, 200);
+        drawLine(el.querySelector('.ws-line'), 1400, 360);
         o.gazeAt(-0.25, 0.3);
-        await sw(1380);
+        await sw(1700);
       } },
     { id: 'orders', dark: true, ms: 2400,
       html: (d) => `<div class="ws-corner">${stripeRings()}</div>${squiggle(1, '#F1EFE6')}
@@ -102,16 +104,16 @@ export function mountStory(ctx) {
         anim(el.querySelector('.ws-corner'), [{ scale: '.6' }, { scale: '1' }], { duration: 1200, easing: 'cubic-bezier(.2,.7,.2,1)' });
         rise([...el.querySelectorAll('.ws-copy > *')], { d0: 120 });
         drawLine(el.querySelector('.ws-line'), 1100, 100);
-        await sw(980);
+        await sw(1250);
         // the line drifts up and goes; the number slams in from the left, counting as it travels
         const copy = el.querySelector('.ws-copy');
-        anim(copy, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-34px)' }], { duration: 260, easing: EASE.out });
+        anim(copy, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-34px)' }], { duration: 420, easing: EASE.out });
         const num = el.querySelector('.ws-num b');
-        anim(num, [{ transform: 'translateX(-115%)' }, { transform: 'none' }], { duration: 680, easing: EASE.move, delay: 120 });
-        countUp([num], d.ORDERS, 640);
-        setTimeout(() => { hap('pop'); o.hop(1.4); }, 480);
-        rise([...el.querySelectorAll('.ws-cap > *')], { d0: 420, y: 18 });
-        await sw(1400);
+        anim(num, [{ transform: 'translateX(-460px)', opacity: 1 }, { transform: 'none', opacity: 1 }], { duration: 1000, easing: SOFT, delay: 200 });
+        countUp([num], d.ORDERS, 950);
+        setTimeout(() => { hap('pop'); o.hop(1.4); }, 820);
+        rise([...el.querySelectorAll('.ws-cap > *')], { d0: 700, y: 18, gap: 90 });
+        await sw(1900);
       } },
     { id: 'saved', dark: false, ms: 2700,
       html: (d) => {
@@ -129,20 +131,20 @@ export function mountStory(ctx) {
         const rows = [...el.querySelectorAll('.ws-row')];
         rows.forEach((row, ri) => [...row.children].forEach((dot, ci) => {
           anim(dot, [{ transform: 'scale(1)', background: '#0E0E0E' }, { transform: 'scale(1.75, .4)', background: '#FEEE00', offset: 0.45 }, { transform: 'scale(1.75, .4)', background: '#FEEE00', offset: 0.7 }, { transform: 'scale(1)', background: '#0E0E0E' }],
-            { duration: 1500, easing: 'cubic-bezier(.65,0,.35,1)', delay: 260 + ci * 70 + (ri % 3) * 40 });
+            { duration: 1900, easing: 'cubic-bezier(.65,0,.35,1)', delay: 300 + ci * 90 + (ri % 3) * 50 });
         }));
         el.querySelectorAll('.ws-dots').forEach((g, i) => anim(g, [{ transform: `translateY(${i ? 40 : -40}px)`, opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: MOVE.ms, easing: EASE.move }));
-        await sw(1000);
-        anim(el.querySelector('.ws-copy'), [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-30px)' }], { duration: 240, easing: EASE.out });
+        await sw(1350);
+        anim(el.querySelector('.ws-copy'), [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-30px)' }], { duration: 420, easing: EASE.out });
         // "You saved" and the amount as a marquee band (the reference's "listening age" ticker)
-        rise([el.querySelector('.ws-kick')], { d0: 140, y: 20 });
+        rise([el.querySelector('.ws-kick')], { d0: 260, y: 20 });
         const marq = el.querySelector('.ws-marq'), track = el.querySelector('.ws-track');
-        anim(marq, [{ transform: 'translateX(60%)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 760, easing: EASE.move, delay: 160 });
+        anim(marq, [{ transform: 'translateX(60%)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 1100, easing: SOFT, delay: 300 });
         track.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-50%)' }], { duration: 5200, iterations: Infinity, easing: 'linear' });
-        countUp([...el.querySelectorAll('.ws-track em')], d.SAVED, 760);
-        setTimeout(() => { hap('success'); o.hop(1.6); }, 620);
-        rise([...el.querySelectorAll('.ws-cap > *')], { d0: 460, y: 16 });
-        await sw(1600);
+        countUp([...el.querySelectorAll('.ws-track em')], d.SAVED, 1100);
+        setTimeout(() => { hap('success'); o.hop(1.6); }, 1000);
+        rise([...el.querySelectorAll('.ws-cap > *')], { d0: 760, y: 16 });
+        await sw(2100);
       } },
     { id: 'curating', dark: true, ms: 1900, final: true,
       html: (d) => `<div class="ws-radar">${'<i></i>'.repeat(4)}</div>
@@ -168,14 +170,14 @@ export function mountStory(ctx) {
         o.stage({ cx: 187.5, cy: Math.max(92, L.cy - 168), unit: 20 }); o.gazeAt(0, 0.45);
         const order = [3, 1, 4, 2, 0, 1];
         for (let k = 0; k < order.length; k++) {
-          await sw(k ? 210 : 420);
+          await sw(k ? 260 : 600);
           const i = order[k], c = cards[i], base = ctx.poseOf(i, 0, 0).transform, side = k % 2 ? 1 : -1;
           c.style.zIndex = '30';
-          const a = anim(c, [{ transform: base }, { transform: `${base} translate(${side * 70}px, -92px) rotate(${side * 14}deg)`, offset: 0.45 }, { transform: base }], { duration: 420, easing: 'cubic-bezier(.45,0,.3,1)' });
+          const a = anim(c, [{ transform: base }, { transform: `${base} translate(${side * 70}px, -92px) rotate(${side * 14}deg)`, offset: 0.45 }, { transform: base }], { duration: 520, easing: 'cubic-bezier(.45,0,.3,1)' });
           hap('tick');
           a.finished.then(() => { c.style.zIndex = String(ctx.poseOf(i, 0, 0).z); a.cancel(); }, () => {});
         }
-        await sw(520);
+        await sw(700);
       } },
   ];
 
@@ -191,9 +193,10 @@ export function mountStory(ctx) {
       // the cut: a full-screen push up (the first beat just appears — the page itself has just arrived)
       if (prev) {
         const p0 = prev;
-        anim(p0, [{ transform: 'none' }, { transform: 'translateY(-100%)' }], { duration: 520, easing: EASE.out }).finished.then(() => p0.remove(), () => p0.remove());
-        anim(el, [{ transform: 'translateY(100%)' }, { transform: 'none' }], { duration: 520, easing: EASE.out });
+        anim(p0, [{ transform: 'none' }, { transform: 'translateY(-34%)' }], { duration: PUSH, easing: SOFT }).finished.then(() => p0.remove(), () => p0.remove());
+        anim(el, [{ transform: 'translateY(100%)' }, { transform: 'none' }], { duration: PUSH, easing: SOFT });
         hap('tap');
+        await new Promise((res) => setTimeout(res, reduce.matches ? 0 : 380));   // (its content starts once the push is under way)
       } else anim(el, [{ opacity: 0 }, { opacity: 1 }], { duration: 260, easing: EASE.in });
       const c = clock(alive, r); cur = b.final ? null : c;
       const seg = progress[i], fill = seg && anim(seg, [{ '--f': 0 }, { '--f': 1 }], { duration: reduce.matches ? 300 : b.ms, easing: 'linear' });
@@ -206,8 +209,8 @@ export function mountStory(ctx) {
   // the last beat steps aside for the stage: its words go, the radar blooms out; its stack is handed over
   function leave(el) {
     if (!el) return;
-    [...el.querySelectorAll('.ws-copy, .ws-cap')].forEach((e) => anim(e, [{ opacity: 1 }, { opacity: 0, transform: 'translateY(-12px)' }], { duration: 200, easing: EASE.out }));
-    el.querySelectorAll('.ws-radar i').forEach((r) => { r.getAnimations().forEach((a) => a.cancel()); anim(r, [{ transform: 'scale(.6)', opacity: 0.6 }, { transform: 'scale(3)', opacity: 0 }], { duration: 520, easing: 'cubic-bezier(.2,.7,.2,1)' }); });
+    [...el.querySelectorAll('.ws-copy, .ws-cap')].forEach((e) => anim(e, [{ opacity: 1 }, { opacity: 0, transform: 'translateY(-12px)' }], { duration: 360, easing: EASE.out }));
+    el.querySelectorAll('.ws-radar i').forEach((r) => { r.getAnimations().forEach((a) => a.cancel()); anim(r, [{ transform: 'scale(.6)', opacity: 0.6 }, { transform: 'scale(3)', opacity: 0 }], { duration: 900, easing: 'cubic-bezier(.2,.7,.2,1)' }); });
   }
   return { run, leave, get skippable() { return !!cur; } };
 }

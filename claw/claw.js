@@ -70,7 +70,6 @@ const CLAW_SVG = `<svg viewBox="0 0 64 56" aria-hidden="true">
   <rect x="20" y="2" width="24" height="16" rx="6" fill="#ffd23c"/><rect x="24" y="7" width="16" height="4" rx="2" fill="#7a3e00" opacity=".4"/></svg>`;
 root.innerHTML = `
   <div class="cx-ground"></div>
-  <div class="cx-progress">${'<i></i>'.repeat(4)}</div>
   <div class="cx-story" data-no-drag></div>
   <div class="st">
     <div class="st-glow"></div>
@@ -93,10 +92,10 @@ root.innerHTML = `
   <div class="cx-say l"></div>
   <div class="cx-burst"></div>
   <div class="cx-confetti"></div>
-  <button class="cx-skip" type="button">Skip</button>`;
+`;
 sheet.appendChild(root);
 const $ = (s) => root.querySelector(s);
-const story = $('.cx-story'), progress = [...root.querySelectorAll('.cx-progress i')], skipBtn = $('.cx-skip');
+const story = $('.cx-story'), progress = [];                         // (no story bars or Skip: the beats just play; a tap advances)
 const say = $('.cx-say'), burst = $('.cx-burst'), confetti = $('.cx-confetti');
 const groundEl = $('.cx-ground');
 const st = $('.st'), car = $('.st-car');
@@ -172,8 +171,6 @@ async function runIntro(r) {
   phase = 'intro';
   const o = window.orbi;
   story.innerHTML = ''; root.classList.add('is-intro');
-  skipBtn.style.opacity = '1'; skipBtn.style.pointerEvents = '';
-  anim($('.cx-progress'), [{ opacity: 0 }, { opacity: 1 }], { duration: 300, easing: EASE.in });
   // (the numerals' face: wait for it briefly so nothing reflows mid-beat)
   try { await Promise.race([document.fonts.load('900 100px Unbounded'), new Promise((res) => setTimeout(res, 900))]); } catch {}
   if (!alive(r)) throw new Error('stale');
@@ -238,7 +235,7 @@ function stepCarousel(dt) {
     }
   }
   if (C.sp.x !== 1) {                                                        // the stack spreading into the carousel (MOVE)
-    for (let left = dt; left > 1e-6; left -= 1 / 240) { const h = Math.min(left, 1 / 240); C.sp.v += (MOVE.w ** 2 * (1 - C.sp.x) - 2 * MOVE.z * MOVE.w * C.sp.v) * h; C.sp.x += C.sp.v * h; }
+    for (let left = dt; left > 1e-6; left -= 1 / 240) { const h = Math.min(left, 1 / 240); C.sp.v += (11 ** 2 * (1 - C.sp.x) - 2 * 0.9 * 11 * C.sp.v) * h; C.sp.x += C.sp.v * h; }
     if (Math.abs(1 - C.sp.x) < 0.0015 && Math.abs(C.sp.v) < 0.02) { C.sp.x = 1; C.sp.v = 0; }
   }
   const f = wrap(Math.round(C.pos));
@@ -320,8 +317,6 @@ async function showStage(r, { again = false, fromStory = null } = {}) {
   phase = 'stage';
   const o = window.orbi;
   root.classList.remove('is-intro'); sheet.classList.add('cx-dark');
-  anim(skipBtn, [{ opacity: 1 }, { opacity: 0 }], { duration: 160, easing: EASE.out }); skipBtn.style.pointerEvents = 'none';
-  anim($('.cx-progress'), [{ opacity: 1 }, { opacity: 0 }], { duration: 200, easing: EASE.out });
   ground('#050506', '#FFFFFF', true);
   o.setState('idle');
   layoutStage();
@@ -338,7 +333,7 @@ async function showStage(r, { again = false, fromStory = null } = {}) {
     st.style.background = 'transparent';
     storyMod.leave(fromStory);
     const end = fromStory;
-    setTimeout(() => { end.remove(); st.style.background = ''; }, 620);
+    setTimeout(() => { end.remove(); st.style.background = ''; }, 900);
     hap('snap');
   }
   st.classList.add('is-on');
@@ -579,12 +574,6 @@ async function start() {
     await showStage(r, { again });
   } catch {}
 }
-skipBtn.addEventListener('click', () => {
-  if (phase !== 'intro') return;
-  hap('tap'); played = true;
-  const r = ++run; story.innerHTML = '';
-  showStage(r).catch(() => {});
-});
 addEventListener('orbi:page', (e) => {
   if (e.detail === 'arrived') start();               // (the page has landed; Orbi finishes its turn meanwhile)
   else if (e.detail === 'closing') { const o = window.orbi; o && (o.lock(false), o.stage(null), o.gazeAt(null), o.statusInk(null)); if (phase !== 'leave') { run++; phase = 'closing'; C.loop = false; Q.on = false; } }

@@ -182,3 +182,42 @@
 @media (prefers-reduced-motion: reduce) {
   .st-grab.is-ready span, .dv-timer i { animation: none; }
 }
+
+/* ══ the world card (claw/card.js, after Figma Sas-Motion 307:49813): a 165 × 190 design box scaled by --k ══ */
+.st-card.mc-card, .tx-card .tx-front { background: var(--bg); border: 1.5px solid var(--bd); }
+.st-card.mc-card { --k: 1.2121; width: 200px; height: 230px; margin-left: -100px; border-radius: 29px; box-shadow: 0 18px 40px rgba(0,0,0,.55); }
+.st-card.mc-card::before, .tx-card .tx-front::before { display: none; }
+.st-card.mc-card::after { opacity: .45; z-index: 3; }
+.tx-card { --k: 1.2121; width: 200px; height: 230px; border-radius: 29px; }
+.tx-card .tx-front { box-shadow: none; }
+.tx-card .tx-back { background: var(--g); }
+.tx-card .tx-back b { color: var(--hd, #fff); }
+.tx-card .tx-back small { color: var(--hd, #fff); opacity: .85; }
+.mc { position: absolute; left: -1.5px; top: -1.5px; width: 165px; height: 190px; transform: scale(var(--k, 1)); transform-origin: 0 0; pointer-events: none; }
+.mc img { position: absolute; display: block; max-width: none; -webkit-user-drag: none; user-select: none; }
+.mc-bg { position: absolute; inset: 0; background: var(--bg); }
+.mc-mask { left: -1.15px; top: 19.5px; width: 176.9px; height: 169px; }
+.mc-spark { left: 12.5px; top: 42.5px; width: 140px; height: 149px; transform: rotate(90deg); }
+.mc-p { width: auto; }
+.mc-star { height: auto; }
+.mc-glow { left: -32.8px; top: 27.4px; width: 166.6px; height: 166.6px; mix-blend-mode: soft-light; }
+.mc-head { position: absolute; left: 0; right: 0; top: 17.5px; display: flex; flex-direction: column; align-items: center; gap: 9px; }
+.mc-head b { font: 800 17px/18px var(--noon); letter-spacing: -0.02em; color: var(--hd); white-space: nowrap;
+  text-shadow: 0 2px 3px color-mix(in srgb, var(--ts) 55%, transparent); }
+.mc-pill { display: inline-block; height: 22px; padding: 3px 10px; box-sizing: border-box; border-radius: 18px; background: var(--pill); white-space: nowrap;
+  font: 800 13px/15.4px var(--noon); letter-spacing: -0.05px; color: #fff; text-shadow: 0 2px 3px var(--ts), 0 1px 1px var(--ts), 0 .6px 0 var(--pill);
+  box-shadow: inset 0 4px 9px rgba(255,255,255,.3), inset 0 -4px 10px rgba(0,0,0,.22); }
+.mc-pill em { font-style: normal; color: #F9E24C; }
+.mc-ins { position: absolute; inset: 0; border-radius: inherit; box-shadow: var(--ins); pointer-events: none; z-index: 2; }
+.st-card.mc-card .c-dim { z-index: 4; border-radius: inherit; }
+
+/* ══ the discovery page's hero: the picked world's card, full width (Figma 307:49813) ══ */
+.dv-hero { padding: 0; height: 472px; background: var(--bg); border-radius: 0 0 36px 36px; isolation: isolate;
+  box-shadow: 0 24px 60px color-mix(in srgb, var(--bg) 35%, transparent); }
+.dv-hero::before, .dv-hero::after { display: none; }
+.dv-art { position: absolute; left: 0; top: 40px; width: 375px; height: 432px; --k: 2.2727; will-change: transform; }
+.dv-art .mc { left: 0; top: 0; }
+.dv-art .mc-head { transform: scale(.62); transform-origin: 50% 0; top: 14px; }
+.dv-art .mc-ins { border-radius: 0 0 36px 36px; top: -40px; }
+.dv-intro { position: relative; padding: 22px 22px 0; }
+.dv-intro .dv-lede { max-width: 262px; color: rgba(255,255,255,.78); }

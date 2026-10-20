@@ -154,8 +154,8 @@ export function mountStory(ctx) {
       async play(el, { sw }, o, d) {
         const L = ctx.layout();
         el.style.setProperty('--cy', `${L.cy}px`);
-        el.querySelector('.ws-copy').style.top = `${Math.round(L.cy - 132)}px`;
-        el.querySelector('.ws-cap').style.top = `${Math.round(L.cy + 200)}px`;
+        el.querySelector('.ws-copy').style.top = `${Math.round(Math.max(118, L.cy - 118))}px`;
+        el.querySelector('.ws-cap').style.top = `${Math.round(L.cy + L.ch + 40)}px`;
         // the five worlds as a stack in the carousel's exact spot and pose (spread 0)
         const stack = el.querySelector('.ws-stack');
         stack.innerHTML = ctx.cardsHTML();
@@ -167,7 +167,7 @@ export function mountStory(ctx) {
         rise([el.querySelector('.ws-cap > *')], { d0: 300, y: 14 });
         // Orbi works the stack: it hovers above, and cards pop out and back as it sorts them
         o.setState('working');
-        o.stage({ cx: 187.5, cy: Math.max(92, L.cy - 168), unit: 20 }); o.gazeAt(0, 0.45);
+        o.stage({ cx: 187.5, cy: Math.max(92, L.cy - 150), unit: 20 }); o.gazeAt(0, 0.45);
         const order = [3, 1, 4, 2, 0, 1];
         for (let k = 0; k < order.length; k++) {
           await sw(k ? 260 : 600);

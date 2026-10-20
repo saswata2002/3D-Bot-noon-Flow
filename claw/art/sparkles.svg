@@ -1,0 +1,59 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="140.067" height="149.17" viewBox="0 0 140.067 149.17" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Decoration">
+<g id="Path" filter="url(#filter0_f_307_49850)">
+<path d="M129.694 56.8284L129.694 55.4131L129.694 53.9979L129.694 55.4131L129.694 56.8284Z" fill="white"/>
+<path d="M129.694 55.4131L129.694 56.8284L129.694 55.4131L129.694 53.9979L129.694 55.4131Z" fill="white"/>
+</g>
+<g id="Path_2">
+<path d="M120.759 80.0345L120.759 79.5357L120.759 79.0369L120.758 79.5357L120.759 80.0345Z" fill="white"/>
+<path d="M120.759 79.5357L120.759 80.0345L120.758 79.5357L120.759 79.0369L120.759 79.5357Z" fill="white"/>
+</g>
+<g id="Path_3" opacity="0.7">
+<path d="M29.6021 143.245L29.6022 141.165L29.6021 139.084L29.602 141.165L29.6021 143.245Z" fill="white"/>
+<path d="M29.6022 141.165L29.6021 143.245L29.602 141.165L29.6021 139.084L29.6022 141.165Z" fill="white"/>
+</g>
+<g id="Path_4" opacity="0.8">
+<path d="M40.2497 149.17L40.2498 148.209L40.2497 147.248L40.2497 148.209L40.2497 149.17Z" fill="white"/>
+<path d="M40.2498 148.209L40.2497 149.17L40.2497 148.209L40.2497 147.248L40.2498 148.209Z" fill="white"/>
+</g>
+<g id="Path_5">
+<path d="M36.6401 131.156L36.6401 130.615L36.6401 130.074L36.64 130.615L36.6401 131.156Z" fill="white"/>
+<path d="M36.6401 130.615L36.6401 131.156L36.64 130.615L36.6401 130.074L36.6401 130.615Z" fill="white"/>
+</g>
+<g id="Path_6">
+<path d="M140.067 45.9972L140.067 45.2821L140.067 44.5671L140.067 45.2821L140.067 45.9972Z" fill="white"/>
+<path d="M140.067 45.2821L140.067 45.9972L140.067 45.2821L140.067 44.5671L140.067 45.2821Z" fill="white"/>
+</g>
+<g id="Path_7">
+<path d="M23.2673 2.21344L23.2674 1.10676L23.2673 7.67075e-05L23.2672 1.10676L23.2673 2.21344Z" fill="white"/>
+<path d="M23.2674 1.10676L23.2673 2.21344L23.2672 1.10676L23.2673 7.67075e-05L23.2674 1.10676Z" fill="white"/>
+</g>
+<g id="Path_8">
+<path d="M50.0674 23.0125L50.0675 21.818L50.0674 20.6235L50.0674 21.818L50.0674 23.0125Z" fill="white"/>
+<path d="M50.0675 21.818L50.0674 23.0125L50.0674 21.818L50.0674 20.6235L50.0675 21.818Z" fill="white"/>
+</g>
+<g id="Path_9" opacity="0.3">
+<path d="M123.426 11.1755L123.426 10.2867L123.426 9.39792L123.426 10.2867L123.426 11.1755Z" fill="white"/>
+<path d="M123.426 10.2867L123.426 11.1755L123.426 10.2867L123.426 9.39792L123.426 10.2867Z" fill="white"/>
+</g>
+<g id="Path_10">
+<path d="M1.40066e-05 2.21393L2.79918e-05 1.94669L1.39832e-05 1.67945L0 1.94669L1.40066e-05 2.21393Z" fill="white"/>
+<path d="M2.79918e-05 1.94669L1.40066e-05 2.21393L0 1.94669L1.39832e-05 1.67945L2.79918e-05 1.94669Z" fill="white"/>
+</g>
+<g id="Path_11">
+<path d="M140.059 142.503L140.059 141.65L140.059 140.797L140.059 141.65L140.059 142.503Z" fill="white"/>
+<path d="M140.059 141.65L140.059 142.503L140.059 141.65L140.059 140.797L140.059 141.65Z" fill="white"/>
+</g>
+<g id="Path_12">
+<path d="M37.682 99.5772L37.6821 98.4921L37.682 97.4069L37.6819 98.4921L37.682 99.5772Z" fill="white"/>
+<path d="M37.6821 98.4921L37.682 99.5772L37.6819 98.4921L37.682 97.4069L37.6821 98.4921Z" fill="white"/>
+</g>
+</g>
+<defs>
+<filter id="filter0_f_307_49850" x="126.773" y="51.0767" width="5.8424" height="8.67274" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+<feGaussianBlur stdDeviation="1.46056" result="effect1_foregroundBlur_307_49850"/>
+</filter>
+</defs>
+</svg>

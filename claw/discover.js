@@ -6,6 +6,8 @@
    Motion: the noon standard — sections rise on the MOVE spring with a 60 ms stagger and fade in out-cubic
    200 ms; the hero parallaxes; the top bar fades in once the hero has scrolled away. ══ */
 
+import { cardArt, cardVars } from './card.js';
+
 const pct = (p) => (p.was ? Math.round((1 - p.price / p.was) * 100) : 0);
 const aed = (n) => (Math.round(n * 100) / 100).toLocaleString('en-US', { maximumFractionDigits: n % 1 ? 2 : 0 });
 const short = (t, n = 56) => (t.length > n ? `${t.slice(0, n).replace(/\s+\S*$/, '')}…` : t);
@@ -42,12 +44,12 @@ export function mountDiscover(ctx) {
       <div class="t-in"><div class="t-brand">${esc(p.brand)}</div><div class="t-ttl">${esc(short(p.title))}</div>
       <div class="t-row"><b><small>AED</small>${aed(p.price)}</b>${pct(p) >= 5 ? `<u>-${pct(p)}%</u>` : `<u>★ ${p.rating || '4.5'}</u>`}<button class="dv-q" type="button" aria-label="Add to cart">+</button></div></div></div>`;
     scroller.innerHTML = `
-      <div class="dv-hero"><div class="h-in">
+      <div class="dv-hero" style="${cardVars(s)}"><div class="dv-art">${cardArt(s)}</div></div>
+      <div class="dv-intro h-in">
         <div class="dv-cap">🏆 PICK OF THE DAY · ${esc(st.cap.toUpperCase())}</div>
-        <div class="dv-h1">${esc(s.name)}</div>
         <div class="dv-lede">${esc(st.lede)}</div>
         <div class="dv-timer"><i></i><span>Deal ends in <b class="dv-clock">--:--:--</b></span></div>
-      </div></div>
+      </div>
       <div class="dv-sec dv-rv" data-say="spot">
         <div class="dv-spot"><span class="s-tag">🏆 TOP PICK</span>${pct(spot) >= 5 ? `<span class="s-off">-${pct(spot)}%</span>` : ''}
           <div class="s-stage"><div class="s-disc"></div><div class="s-img"><img src="${spot.img}" alt="" decoding="async"></div></div>
@@ -128,14 +130,14 @@ export function mountDiscover(ctx) {
   }
 
   // Orbi on the page: in the hero, then the bottom corner once you scroll; a line per section
-  const HERO_BOT = () => ({ cx: 322, cy: 96, unit: 24 });
+  const HERO_BOT = () => ({ cx: 334, cy: 520, unit: 19 });          // beside the words under the hero (the hero's heading has the top)
   const CORNER = () => ({ cx: 342, cy: sheet.clientHeight - 56, unit: 15 });
   function onScroll() {
     const y = scroller.scrollTop;
-    const hin = scroller.querySelector('.h-in');
-    if (hin) { hin.style.transform = `translateY(${(y * 0.38).toFixed(1)}px)`; hin.style.opacity = String(Math.max(0, 1 - y / 260)); }
-    bar.classList.toggle('is-on', y > 230);
-    const c = y > 150;
+    const art = scroller.querySelector('.dv-art');
+    if (art) art.style.transform = `translateY(${(Math.max(0, y) * 0.35).toFixed(1)}px)`;
+    bar.classList.toggle('is-on', y > 360);
+    const c = y > 200;
     if (c !== corner) { corner = c; window.orbi?.stage(c ? CORNER() : HERO_BOT()); if (c) ctx.hush(); }
   }
   scroller.addEventListener('scroll', onScroll, { passive: true });
@@ -162,6 +164,9 @@ export function mountDiscover(ctx) {
     build(s); scroller.scrollTop = 0;
     dv.classList.add('is-on');
     clock(); clearInterval(timerT); timerT = setInterval(clock, 1000);
+    scroller.querySelectorAll('.dv-art .mc-p, .dv-art .mc-star').forEach((im, i) => {
+      anim(im, [{ translate: '0 70px', scale: '.72' }, { translate: '0 0', scale: '1' }], { duration: 760, easing: EASE.pop, delay: 120 + i * 70 });
+    });
     const lines = [...scroller.querySelectorAll('.h-in > *')];
     lines.forEach((el, i) => {
       anim(el, [{ transform: 'translateY(26px)' }, { transform: 'none' }], { duration: MOVE.ms, easing: EASE.move, delay: 80 + i * 60 });

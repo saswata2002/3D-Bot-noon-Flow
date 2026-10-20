@@ -14,6 +14,7 @@
 import { SETS } from './catalog.js';
 import { mountDiscover } from './discover.js';
 import { mountStory } from './story.js';
+import { CARD, cardArt, cardVars } from './card.js';
 
 // ─── who it's for: a 2026 order history (demo data) and what it adds up to ──────────────────────────────
 const USER = { name: 'Saswata' };
@@ -29,12 +30,12 @@ const EVERY = Math.round(365 / ORDERS);
 // each world's card: a metallic gradient (the reference's foil cards), the glow its pages are lit with, and
 // the best offer inside it (the deepest discount among its products)
 const LOOK = {
-  gym: { grad: 'linear-gradient(125deg, #0b6b4a 0%, #19a873 48%, #0e5e43 100%)', glow: '#19a873', cap: 'GYM ESSENTIALS' },
-  tech: { grad: 'linear-gradient(125deg, #1f5fa5 0%, #59b6e8 50%, #2a73b8 100%)', glow: '#3d9be0', cap: 'AUDIO & WEARABLES' },
-  scents: { grad: 'linear-gradient(125deg, #4b2a7b 0%, #9b6fd6 50%, #3a1f63 100%)', glow: '#8a5cd0', cap: 'SIGNATURE PERFUMES' },
-  glow: { grad: 'linear-gradient(125deg, #a83f68 0%, #f08fb2 50%, #93365b 100%)', glow: '#e0709a', cap: 'SKINCARE & GLOW' },
-  home: { grad: 'linear-gradient(125deg, #a85a16 0%, #f2a65a 50%, #8f4c16 100%)', glow: '#e8913f', cap: 'KITCHEN UPGRADES' },
+  gym: { cap: 'GYM ESSENTIALS' }, tech: { cap: 'AUDIO & WEARABLES' }, scents: { cap: 'SIGNATURE PERFUMES' },
+  glow: { cap: 'SKINCARE & GLOW' }, home: { cap: 'KITCHEN UPGRADES' },
 };
+// (the world's colour, from its card: `grad` floods the screen and grounds the discovery page, `glow` lights the floor)
+const shade = (hex, k) => '#' + [1, 3, 5].map((i) => Math.round(parseInt(hex.slice(i, i + 2), 16) * k).toString(16).padStart(2, '0')).join('');
+Object.entries(CARD).forEach(([id, c]) => { LOOK[id].grad = `linear-gradient(165deg, ${c.bg} 0%, ${shade(c.bg, 0.72)} 100%)`; LOOK[id].glow = c.bg; });
 SETS.forEach((s) => Object.assign(s, LOOK[s.id], { best: Math.max(...s.products.map((p) => (p.was ? Math.round((1 - p.price / p.was) * 100) : 0))) }));
 const ORDER = ['tech', 'gym', 'scents', 'glow', 'home'].map((id) => SETS.find((s) => s.id === id));   // the carousel, your top world first
 const N = ORDER.length;
@@ -152,9 +153,7 @@ function placeSay() {
 }
 
 // ─── 1 · the story: four Wrapped-style beats (claw/story.js) ───────────────────────────────────────────
-const cardHTML = (s, i) => `<div class="st-card" data-i="${i}" style="--g:${s.grad}">
-      <div class="c-brand"><i>${s.emoji}</i>${s.name}</div><div class="c-cap">${s.cap}</div>
-      <div class="c-band"><small style="margin:0 6px 0 0">UP TO</small>${s.best}%<small>OFF</small></div><i class="c-dim"></i></div>`;
+const cardHTML = (s, i) => `<div class="st-card mc-card" data-i="${i}" style="${cardVars(s)}">${cardArt(s)}<i class="c-dim"></i></div>`;
 const storyMod = mountStory({
   story, progress, anim, EASE, MOVE, hap, reduce,
   ink: (dark) => { root.style.setProperty('--ink', dark ? '#F1EFE6' : '#0E0E0E'); window.orbi && window.orbi.statusInk(dark ? 1 : null); },
@@ -179,7 +178,7 @@ async function runIntro(r) {
 car.innerHTML = ORDER.map(cardHTML).join('');
 const cards = [...car.querySelectorAll('.st-card')];
 const L = { H: 0, cy: 0, k: 1, hh: 150 };
-const CW = 260, CH = 158, SPREAD = 236, FAR = 110;                       // card size, neighbour offset, far offset
+const CW = 200, CH = 230, SPREAD = 200, FAR = 96;                       // card size, neighbour offset, far offset
 const ORBI_HOME = () => ({ cx: 322, cy: 84, unit: 22 });              // top right, level with the back arrow
 function layoutStage() {
   // a quiet header, then the carousel centred between it and the GRAB plinth (the page is the cards)
@@ -187,7 +186,7 @@ function layoutStage() {
   const hh = lerp(136, 150, k), bl = Hh - lerp(176, 190, k), by = bl + 8;
   const cy = Math.round((hh + bl) / 2 - CH / 2 - lerp(14, 22, k));
   const fy = cy + CH - 26, gy = cy + CH + lerp(30, 40, k);
-  Object.assign(L, { H: Hh, k, cy, hh });
+  Object.assign(L, { H: Hh, k, cy, hh, ch: CH });
   for (const [n, x] of Object.entries({ hh, bl, by, cy, fy, gy })) st.style.setProperty(`--${n}`, `${x.toFixed(1)}px`);
 }
 
@@ -397,7 +396,7 @@ async function grab(r) {
   const card = cards[ti];
   anim(card, [{ transform: card.style.transform }, { transform: `${card.style.transform} scale(1.06)`, offset: 0.35 }, { transform: card.style.transform }], { duration: 420, easing: EASE.pop });
   // Orbi flies over the card
-  const y0 = L.cy - 132;
+  const y0 = Math.max(96, L.cy - 132);
   o.stage({ cx: 187.5, cy: y0, unit: 22 });
   await until(() => Math.abs(o.view.cy - y0) < 3 && Math.abs(o.view.cx - 187.5) < 3, r, 900);
   // the claw drops out of Orbi: prongs open on the way down, close on the card's top edge
@@ -436,7 +435,7 @@ async function toDiscover(set, card, r) {
   const cx = (cr.left + cr.width / 2 - s.left) * k, cy = (cr.top + cr.height / 2 - s.top) * k;
   // the flying card: a copy with a back (the next page's title), started exactly where the claw holds it
   const fc = document.createElement('div');
-  fc.className = 'tx-card'; fc.style.setProperty('--g', set.grad);
+  fc.className = 'tx-card'; fc.setAttribute('style', card.getAttribute('style').replace(/transform[^;]*;?/g, '').replace(/opacity[^;]*;?/g, '').replace(/z-index[^;]*;?/g, '')); fc.style.setProperty('--g', set.grad);
   fc.innerHTML = `<div class="tx-front">${card.innerHTML}</div><div class="tx-back"><div><b>${set.name}</b><small>PICK OF THE DAY</small></div></div>`;
   tx.appendChild(fc); tx.style.setProperty('--g', set.grad); tx.classList.add('is-on');
   flood.style.clipPath = `circle(0px at ${cx}px ${cy}px)`;
@@ -457,7 +456,7 @@ async function toDiscover(set, card, r) {
   sparkBurst(ex, ey, r);
   setTimeout(() => alive(r) && hap('snap'), 420);
   Q.follow = false;
-  o.stage({ cx: 322, cy: 96, unit: 24 }); o.gazeAt(-0.2, 0.25);
+  o.stage({ cx: 334, cy: 520, unit: 19 }); o.gazeAt(-0.2, 0.25);
   setTimeout(() => alive(r) && o.hop(2), 380);
   await done(fly, r);
   await done(fl, r).catch(() => {});

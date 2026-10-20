@@ -12,30 +12,20 @@
 .ws-line { position: absolute; left: 0; top: 12%; width: 100%; height: 140px; pointer-events: none; z-index: 2; }
 .ws-line path { fill: none; stroke-width: 2; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; }
 /* numerals: extended, black weight, yellow with an ink outline */
-.ws-year, .ws-num b, .ws-band b { font-family: 'Unbounded', 'Noontree', system-ui, sans-serif; font-weight: 900; color: #FEEE00;
-  -webkit-text-stroke: 4px #0E0E0E; paint-order: stroke fill; letter-spacing: -0.05em; white-space: nowrap; font-variant-numeric: tabular-nums; }
-
-/* 0 · open */
-.ws-half { position: absolute; left: 0; right: 0; height: 50%; overflow: hidden; background: #F1EFE6; z-index: 3; will-change: transform; }
-.ws-half.t { top: 0; } .ws-half.b { bottom: 0; }
-.ws-rings { position: absolute; left: 50%; width: 1100px; height: 1100px; margin-left: -550px; will-change: rotate, scale; }
-.ws-half.t .ws-rings { top: calc(100% - 550px); } .ws-half.b .ws-rings { top: -550px; }
-.ws-rings svg, .ws-corner svg { display: block; width: 100%; height: 100%; }
-.ws-year { position: absolute; left: 0; right: 0; top: 50%; margin-top: -142px; z-index: 4; text-align: center; font-size: 150px; line-height: 142px; }
-.ws-year span { display: block; }
-.ws-open .ws-copy { top: 36%; }
-.ws-band { position: absolute; left: 0; right: 0; bottom: 0; height: 26%; overflow: hidden; transform: translateY(100%);
-  background: repeating-linear-gradient(90deg, #0E0E0E 0 14px, #F1EFE6 14px 28px); border-top: 3px solid #0E0E0E; }
-.ws-btrack { position: absolute; left: 0; top: 50%; margin-top: -92px; display: flex; width: max-content; will-change: transform; }
-.ws-band b { flex: none; padding-right: 28px; font-size: 176px; line-height: 184px; }
-
-/* 1 · orders */
-.ws-corner { position: absolute; left: -230px; bottom: -290px; width: 540px; height: 540px; will-change: rotate, scale; }
-.ws-orders .ws-copy { top: 38%; }
-.ws-num { position: absolute; left: 0; right: 0; top: 30%; text-align: center; pointer-events: none; }
-.ws-num b { display: inline-block; font-size: 210px; line-height: 220px; transform: translateX(-460px); opacity: 0; text-shadow: 8px 8px 0 #5E5600; }   /* (off-screen and hidden until it slams in: the narrow "0" would peek) */
-.ws-cap { position: absolute; left: 24px; right: 24px; top: calc(30% + 228px); text-align: center; z-index: 2; }
+.ws-cap { position: absolute; left: 24px; right: 24px; text-align: center; z-index: 2; }
 .ws-cap > *, .ws-kick { opacity: 0; }
+
+/* 1 · orders: kicker / the count (Unbounded 900, yellow, an olive offset shadow) / "orders" / a line */
+.ws-corner { position: absolute; left: -230px; bottom: -290px; width: 540px; height: 540px; will-change: rotate, scale; }
+.ws-ord { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-56%); text-align: center; }
+.ws-k { font: 800 22px/28px var(--noon); letter-spacing: -0.02em; opacity: 0; }
+.ws-big { display: flex; justify-content: center; margin-top: 6px; perspective: 600px; }
+.ws-big span { position: relative; display: block; }
+.ws-big b { display: block; font: 900 200px/196px 'Unbounded', 'Noontree', system-ui, sans-serif; letter-spacing: -0.06em; color: #FEEE00;
+  text-shadow: 8px 8px 0 #5E5600; transform-origin: 50% 100%; opacity: 0; will-change: transform; }
+.ws-ring { position: absolute; left: 50%; top: 50%; width: 220px; height: 220px; margin: -110px 0 0 -110px; border-radius: 50%; box-shadow: inset 0 0 0 5px #FEEE00; opacity: 0; pointer-events: none; }
+.ws-w { margin-top: 2px; font: 900 40px/44px 'Unbounded', 'Noontree', system-ui, sans-serif; letter-spacing: -0.04em; color: #F1EFE6; opacity: 0; }
+.ws-ord .ws-s { margin-top: 12px; font-size: 15px; opacity: 0; }
 
 /* 2 · saved: two light dot rows top and bottom, "You saved", a slot-machine plaque (ink reels in a yellow
    sticker with an offset ink shadow, the Wrapped look) */
@@ -60,18 +50,9 @@
 .ws-cap.s { top: calc(50% + 68px); }
 .ws-cap.s .ws-s { font-size: 15px; opacity: .8; }
 
-/* 3 · curating */
-.ws-radar { position: absolute; left: 50%; top: calc(var(--cy, 284px) + 162px); width: 0; height: 0; }
-.ws-radar i { position: absolute; left: -190px; top: -190px; width: 380px; height: 380px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px rgba(241, 239, 230, .5); opacity: 0; will-change: transform, opacity; }
-.ws-copy.c { top: 150px; }
-.ws-ell i { font-style: normal; display: inline-block; animation: ws-ell 1.1s ease-in-out infinite; }
-.ws-ell i:nth-child(2) { animation-delay: .15s; } .ws-ell i:nth-child(3) { animation-delay: .3s; }
-@keyframes ws-ell { 0%, 60%, 100% { opacity: .25; transform: none; } 30% { opacity: 1; transform: translateY(-4px); } }
-.ws-stack { position: absolute; left: 0; right: 0; top: var(--cy, 284px); height: 340px; perspective: 760px; z-index: 2; }
-.ws-cap.c { top: 470px; }
-
 @media (prefers-reduced-motion: reduce) { .ws-ell i { animation: none; opacity: 1; } }
 /* short screens (≤ 760 tall): one less dot row on top, the corner rings lower, so the words keep clear */
 @media (max-height: 760px) {
-  .ws-corner { bottom: -350px; }
+  .ws-corner { bottom: -360px; }
+  .ws-big b { font-size: 170px; line-height: 168px; }
 }

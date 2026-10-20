@@ -298,25 +298,23 @@ async function showStage(r, { again = false, fromStory = null } = {}) {
   Object.assign(C, { frozen: false, carriedEl: null, drag: null, spin: null, v: 0, focus: -1 });
   cards.forEach((c) => { c.style.transformOrigin = ''; c.style.visibility = ''; });
   C.sp = { x: 1, v: 0 };
-  if (fromStory) { C.pos = 0; C.to = 0; C.sp = { x: 0, v: 0 }; }          // (the story's stack spreads into the carousel)
+  if (fromStory) { C.pos = -1.3; C.to = 0; }                              // (the cards glide in as the page arrives)
   else if (!again) { C.pos = -2.6; C.to = 0; }                           // (the sweep: the cards glide in on MOVE)
   else { C.to = Math.round(C.pos); C.pos = C.to - 1.4; }
+  const d0 = fromStory ? 380 : 0;
   if (fromStory) {
-    // the stage takes over the last beat in place: the same black, the same cards in the same pose; the beat's
-    // words go and its radar blooms out under the stage (see-through until the beat is gone)
-    st.style.background = 'transparent';
-    anim(lpBg, [{ opacity: 0 }, { opacity: 1 }], { duration: 760, easing: EASE.out });   // (the light page comes up over the story's black)
+    // the card page slides up over the last beat — the story's own cut — and the beat drifts up behind it
+    const { PUSH, SOFT } = storyMod.cut;
     storyMod.leave(fromStory);
-    const end = fromStory;
-    setTimeout(() => { end.remove(); st.style.background = ''; }, 900);
-    hap('snap');
+    anim(st, [{ transform: 'translateY(100%)', boxShadow: '0 -24px 48px rgba(0,0,0,.25)' }, { transform: 'none', boxShadow: '0 0 0 rgba(0,0,0,0)' }], { duration: PUSH, easing: SOFT });
+    hap('tap');
   }
   st.classList.add('is-on');
   C.loop = true; C.last = 0; requestAnimationFrame(stageTick);
   if (!fromStory) anim(lpBg, [{ opacity: 0 }, { opacity: 1 }], { duration: 400, easing: EASE.out });
   ENTER().forEach((el, i) => {
-    anim(el, [{ transform: 'translateY(22px)' }, { transform: 'none' }], { duration: MOVE.ms, easing: EASE.move, delay: 60 + i * 40 });
-    anim(el, [{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: EASE.in, delay: 60 + i * 40 });
+    anim(el, [{ transform: 'translateY(22px)' }, { transform: 'none' }], { duration: MOVE.ms, easing: EASE.move, delay: d0 + 60 + i * 40 });
+    anim(el, [{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: EASE.in, delay: d0 + 60 + i * 40 });
   });
   setTimeout(() => alive(r) && hap('land', 0.5), 260);
   // Orbi settles into the header, where it operates the claw from

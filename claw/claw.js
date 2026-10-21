@@ -177,7 +177,8 @@ car.innerHTML = ORDER.map(cardHTML).join('');
 const cards = [...car.querySelectorAll('.st-card')];
 const L = { H: 0, cy: 0, k: 1, hh: 150 };
 const CW = 244, CH = 325, SPREAD = 242.5, FAR = 212;                    // Figma: 244 × 325 coupon, 183 × 244 neighbours, 29 gap
-const ORBI_HOME = () => ({ cx: 187.5, cy: Math.round((100 + L.cy) / 2), unit: 22 });   // top centre, between the header and the cards
+const BOT_UNIT = () => Math.round(lerp(27, 32, L.k));                  // the bot on the landing page (≈ 1.4× the first cut)
+const ORBI_HOME = () => ({ cx: 187.5, cy: Math.round((96 + L.cy) / 2), unit: BOT_UNIT() });   // top centre, between the header and the cards
 function layoutStage() {
   // Figma 309:49973 at 812: cards 201.7, title 582.7, CTA 670.7 (52 tall); shorter screens tighten the gaps
   const Hh = sheet.clientHeight, k = clamp((Hh - 691) / (812 - 691), 0, 1);
@@ -342,7 +343,7 @@ grabBtn.addEventListener('click', () => { if (phase === 'ready') grab(run).catch
 
 // the claw hangs from Orbi: Orbi's spot glides on a spring, the cable reels, the claw swings as a pendulum
 const Q = { on: false, x: 0, vx: 0, tx: 0, y: 0, vy: 0, ty: 0, L: 0, Lv: 0, Lt: 0, th: 0, thv: 0, open: 0, openv: 0, opent: 0, k: { w: 9, z: 0.92 } };
-const cableTop = () => Q.y + 19;                                           // (from under the ball)
+const cableTop = () => Q.y + BOT_UNIT() * 0.86;                            // (from under the ball)
 const hubPos = () => ({ x: Q.x + Math.sin(Q.th) * Q.L, y: cableTop() + Math.cos(Q.th) * Q.L });
 function stepClaw(dt) {
   for (let left = dt; left > 1e-6; left -= 1 / 240) {
@@ -362,7 +363,7 @@ function stepClaw(dt) {
   prongs.forEach((p) => { const k = +p.dataset.k; p.setAttribute('transform', `rotate(${(k * ang).toFixed(2)} ${k < 0 ? 28 : 36} 14)`); });
   if (C.carriedEl) C.carriedEl.style.transform = `translate3d(${(hub.x - 187.5).toFixed(2)}px, ${(hub.y + 30 - L.cy).toFixed(2)}px, 0) rotate(${(deg + C.tilt).toFixed(2)}deg)`;
   const o = window.orbi;
-  if (o && Q.follow) { o.stage({ cx: Q.x, cy: Q.y, unit: 22 }, { snap: true }); o.gazeAt(clamp(Q.vx / 900, -0.3, 0.3), 0.42); }
+  if (o && Q.follow) { o.stage({ cx: Q.x, cy: Q.y, unit: BOT_UNIT() }, { snap: true }); o.gazeAt(clamp(Q.vx / 900, -0.3, 0.3), 0.42); }
 }
 const settled = (x, t, v, eps = 1.5, veps = 30) => Math.abs(t - x) < eps && Math.abs(v) < veps;
 function until(cond, r, maxMs = 3000) {
@@ -387,8 +388,8 @@ async function grab(r) {
   const card = cards[ti];
   anim(card, [{ transform: card.style.transform }, { transform: `${card.style.transform} scale(1.06)`, offset: 0.35 }, { transform: card.style.transform }], { duration: 420, easing: EASE.pop });
   // Orbi flies over the card
-  const y0 = Math.max(70, L.cy - 112);
-  o.stage({ cx: 187.5, cy: y0, unit: 22 });
+  const y0 = Math.max(78, L.cy - 124);
+  o.stage({ cx: 187.5, cy: y0, unit: BOT_UNIT() });
   await until(() => Math.abs(o.view.cy - y0) < 3 && Math.abs(o.view.cx - 187.5) < 3, r, 900);
   // the claw drops out of Orbi: prongs open on the way down, close on the card's top edge
   Object.assign(Q, { on: true, follow: true, x: o.view.cx, tx: 187.5, vx: 0, y: o.view.cy, ty: y0, vy: 0, L: 4, Lt: 4, Lv: 0, th: 0, thv: 0, open: 0, opent: 1 });

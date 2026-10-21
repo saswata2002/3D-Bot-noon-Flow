@@ -253,3 +253,10 @@
 .st-grab.lp-cta span { position: static; display: block; height: 52px; border-radius: 0; background: none; box-shadow: none; transform: none !important; animation: none !important;
   font: 600 16px/52px var(--noon); letter-spacing: 0; color: #FFFFFF; text-align: center; }
 .st-grab.lp-cta.is-down { transform: scale(.98); background: #1C0757; }
+
+/* the grab: the win glow behind the lifted coupon, and the coupon flying in to become the end page's hero */
+.st-win { position: absolute; width: 420px; height: 420px; z-index: 1; pointer-events: none; border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(166,150,255,.75) 0%, rgba(254,238,0,.28) 45%, rgba(166,150,255,0) 100%); }
+.lx { position: absolute; z-index: 30; overflow: hidden; background: #FFFFFF; pointer-events: none; transform-origin: 50% 50%;
+  box-shadow: inset 0 0 0 1px #EAECF0; will-change: left, top, width, height, transform; }
+.lx-in { position: absolute; left: 50%; top: 0; width: 244px; height: 325px; transform: translateX(-50%); transform-origin: 50% 0; }

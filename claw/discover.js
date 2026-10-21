@@ -61,6 +61,13 @@ function trendCard(p, i) {
       <div class="op-tpa"><div class="op-meta">${rating(p.rating, p.count)}<img class="op-exp" src="${I}express.svg" alt="express"></div>${addBtn()}</div></div></div>`;
 }
 
+const warmed = new Set();
+export function preload(s, { heroOnly = false } = {}) {
+  const o = OFFERS[s.id]; if (!o) return;
+  const urls = heroOnly ? [o.hero.img] : [o.hero.img, o.similar.img, ...o.brands.map((p) => p.img), ...o.trending.map((p) => p.img), ...o.light.picks.map((p) => p.img), ...s.products.filter((p) => p.was).slice(0, 6).map((p) => p.img)];
+  urls.forEach((u) => { if (!u || warmed.has(u)) return; warmed.add(u); const im = new Image(); im.decoding = 'async'; im.src = u; });
+}
+
 export function mountDiscover(ctx) {
   const { root, anim, EASE, MOVE, hap } = ctx;
   const dv = document.createElement('div');
@@ -171,12 +178,19 @@ export function mountDiscover(ctx) {
     scroller.querySelectorAll('.op-rv').forEach((el) => io.observe(el));
   }
 
-  // in: the page fades up, the hero card rises with its product popping in; the rest reveals on scroll
-  function show(s, { fromFlood = true } = {}) {
+  // in: the page fades up, the hero card rises with its product popping in; the rest reveals on scroll.
+  // { land: true } — the grabbed coupon is flying in to become the hero card: the page starts see-through with
+  // its header, glow, hero and sections held back, and this returns where the hero card sits (sheet coords)
+  function show(s, { fromFlood = true, land = false } = {}) {
     on = true;
     build(s); scroller.scrollTop = 0; onScroll();
     dv.classList.add('is-on');
     window.orbi?.statusInk(null);
+    if (land) {
+      dv.classList.add('is-landing');
+      const sr = dv.getBoundingClientRect(), k = 375 / sr.width, hr = scroller.querySelector('.op-hero').getBoundingClientRect();
+      return { x: (hr.left - sr.left) * k, y: (hr.top - sr.top) * k, w: hr.width * k, h: hr.height * k };
+    }
     const a = anim(dv, [{ opacity: 0 }, { opacity: 1 }], { duration: fromFlood ? 260 : 200, easing: EASE.in });
     const hero = scroller.querySelector('.op-hero'), heroImg = scroller.querySelector('.op-hmedia .op-img');
     anim(scroller.querySelector('.op-hero-sec .op-title'), [{ transform: 'translateY(16px)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: MOVE.ms, easing: EASE.move, delay: 80 });
@@ -185,13 +199,27 @@ export function mountDiscover(ctx) {
     requestAnimationFrame(observe);
     return a;
   }
+  // the landing, timed to the coupon's flight (ms): the white ground and the yellow glow come up behind it, the
+  // header and the section title settle in, and as it lands the hero card's face appears and its product pops
+  function land(ms) {
+    const q = (sel) => scroller.querySelector(sel);
+    anim(dv, [{ backgroundColor: 'rgba(255,255,255,0)' }, { backgroundColor: '#FFFFFF' }], { duration: ms * 0.55, easing: EASE.out, delay: ms * 0.12 });
+    anim(q('.op-glow'), [{ opacity: 0 }, { opacity: 1 }], { duration: 520, easing: EASE.in, delay: ms * 0.3 });
+    anim(head, [{ opacity: 0, transform: 'translateY(-8px)' }, { opacity: 1, transform: 'none' }], { duration: MOVE.ms, easing: EASE.move, delay: ms * 0.45 });
+    anim(q('.op-hero-sec .op-title'), [{ opacity: 0, transform: 'translateY(14px)' }, { opacity: 1, transform: 'none' }], { duration: MOVE.ms, easing: EASE.move, delay: ms * 0.5 });
+    anim(q('.op-hero'), [{ opacity: 0 }, { opacity: 1 }], { duration: ms * 0.44, easing: EASE.in, delay: ms * 0.42 });
+    const img = q('.op-hmedia .op-img');
+    if (img) anim(img, [{ transform: 'translateY(26px) scale(.8)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 760, easing: EASE.pop, delay: ms * 0.6 });
+    // the rest of the page: the sections in view rise in once it has landed (60 ms stagger)
+    setTimeout(() => { if (!on) return; observe(); setTimeout(() => dv.classList.remove('is-landing'), 60); }, ms + 120);
+  }
   function hide({ instant = false } = {}) {
-    on = false; io && io.disconnect();
+    on = false; io && io.disconnect(); dv.classList.remove('is-landing');
     if (instant) { dv.classList.remove('is-on'); dv.getAnimations().forEach((x) => x.cancel()); return Promise.resolve(); }
     const a = anim(dv, [{ opacity: 1 }, { opacity: 0 }], { duration: 220, easing: EASE.out });
     return a.finished.catch(() => {}).then(() => { dv.classList.remove('is-on'); a.cancel(); });
   }
   back.addEventListener('pointerdown', () => hap('tap'));
   back.addEventListener('click', () => on && ctx.onAgain());
-  return { el: dv, show, hide, get on() { return on; }, poke() {} };
+  return { el: dv, show, land, hide, get on() { return on; }, poke() {} };
 }

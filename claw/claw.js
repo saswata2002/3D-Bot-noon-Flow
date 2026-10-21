@@ -2,17 +2,17 @@
    The bot's full page (orbi/main.js opens it): a 5-beat personalised "Wrapped" intro built from the order
    history, then "Pick of the day" — a dark stage (after the user's CRED "Deal of the day" reference): a chrome
    serif headline, a swipeable 3D carousel of five metallic cards (one per world of real noon products), each
-   previewing its best offer, and a gold GRAB button. GRAB → the carousel spins like a slot reel onto Orbi's
-   pick, Orbi flies over it and lowers a claw, which clamps the card and lifts it while the rest fall away; the
-   card bursts into a full-screen flood of its colour (light rays, sparkles), flips, and its back becomes the
-   hero of that world's discovery page (claw/discover.js) — a page made for the set, not a PLP.
+   previewing its best offer, and a GRAB button. GRAB → the reel spins onto the bot's pick (its eyes tracking it),
+   the claw shoots down, squeezes the coupon and lifts it while the rest slide off, a glow and confetti burst
+   behind it, and the coupon flies into the end page and becomes its "Perfect deal pick" card (a shared-element
+   morph) — the hero of that world's discovery page (claw/discover.js) — a page made for the set, not a PLP.
    Motion: the noon standard (~/.claude/skills/noon_sas_motion) — MOVE spring 280.6/27.14 for anything that
    moves (the carousel settles on it too), out-cubic 200 ms fades in, in-out-cubic fades out, 60 ms stagger in /
    25 ms out, EXPAND (0.4, 0.01, 0, 1.01) for the flood, a livelier spring (ζ .55) only for rewards; the claw
    (cable, pendulum, prongs) is integrated per frame. Orbi is the host throughout: it operates the claw, narrates,
    and follows you down the discovery page. ══ */
 import { SETS } from './catalog.js';
-import { mountDiscover } from './discover.js';
+import { mountDiscover, preload } from './discover.js';
 import { mountStory } from './story.js';
 import { CARD, cardArt, cardVars, couponArt } from './card.js';
 
@@ -242,7 +242,9 @@ function stepCarousel(dt) {
 function stageTick(now) {
   if (!C.loop) return;
   const dt = Math.min(0.05, C.last ? (now - C.last) / 1000 : 1 / 60); C.last = now;
+  const pp = C.pos;
   stepCarousel(dt);
+  if (C.watch && window.orbi) window.orbi.gazeAt(clamp(-(C.pos - pp) / dt * 0.05, -0.35, 0.35), 0.5);
   if (Q.on) stepClaw(dt);
   placeSay();
   requestAnimationFrame(stageTick);
@@ -324,6 +326,7 @@ async function showStage(r, { again = false, fromStory = null } = {}) {
   o.lock(true);
   speak(again ? 'Back for another round? 🎰' : 'Swipe the worlds, then hit GRAB 👇', { hold: again ? 1800 : 3000 });
   grabBtn.disabled = false; grabBtn.classList.add('is-ready');
+  ORDER.forEach((s) => preload(s, { heroOnly: true }));
   phase = 'ready';
 }
 
@@ -376,105 +379,106 @@ async function grab(r) {
   hap('snap');
   const o = window.orbi;
   const target = pickSet(); lastPick = target.id;
-  const ti = ORDER.indexOf(target);
-  o.setState('working'); o.gazeAt(-0.1, 0.5);
-  speak('Spinning the worlds… 🎰');
-  // the reel: two full turns and onto the pick (out-quart, ~1.7 s; a tick per card)
+  const ti = ORDER.indexOf(target), card = cards[ti];
+  preload(target);                                                 // (its page's photos load while the machine plays)
+  // 1 · the stage clears for the machine: the words and the CTA sink away (25 ms stagger); the bot gets to work
+  [copyEl, grabBtn].forEach((el, i) => anim(el, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(30px)' }], { duration: 260, easing: EASE.out, delay: i * 25 }));
+  o.setState('working');
+  // 2 · the reel: a turn and a half onto the pick (out-quart, 1.45 s, a tick per card) — the bot's eyes track it
   const base = Math.round(C.pos), off = ((ti - wrap(base)) + N) % N;
-  await spinTo(base + 2 * N + off, 1750);
+  C.watch = true;
+  await spinTo(base + N + (off < 2 ? off + N : off), 1450);
+  C.watch = false;
   if (!alive(r)) throw new Error('stale');
-  hap('snap'); sayBelow = false;
-  speak(`${target.emoji} ${target.name}! Grabbing it…`);
-  const card = cards[ti];
-  anim(card, [{ transform: card.style.transform }, { transform: `${card.style.transform} scale(1.06)`, offset: 0.35 }, { transform: card.style.transform }], { duration: 420, easing: EASE.pop });
-  // Orbi flies over the card
+  hap('snap'); o.gazeAt(0, 0.55);
+  // the pick lights up (the reward spring), its neighbours step back
+  anim(card, [{ scale: '1' }, { scale: '1.05' , offset: 0.35 }, { scale: '1' }], { duration: 460, easing: EASE.pop });
+  cards.filter((c) => c !== card).forEach((c) => anim(c, [{ filter: 'brightness(1)' }, { filter: 'brightness(.82) saturate(.7)' }], { duration: 260, easing: EASE.out }));
+  // 3 · the claw: the bot rises a touch, the claw shoots down (prongs open), squeezes the coupon's top edge
   const y0 = Math.max(78, L.cy - 124);
   o.stage({ cx: 187.5, cy: y0, unit: BOT_UNIT() });
-  await until(() => Math.abs(o.view.cy - y0) < 3 && Math.abs(o.view.cx - 187.5) < 3, r, 900);
-  // the claw drops out of Orbi: prongs open on the way down, close on the card's top edge
-  Object.assign(Q, { on: true, follow: true, x: o.view.cx, tx: 187.5, vx: 0, y: o.view.cy, ty: y0, vy: 0, L: 4, Lt: 4, Lv: 0, th: 0, thv: 0, open: 0, opent: 1 });
-  [cableEl, clawEl].forEach((e) => anim(e, [{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: EASE.in }));
+  await until(() => Math.abs(o.view.cy - y0) < 3, r, 700);
+  Object.assign(Q, { on: true, follow: true, x: o.view.cx, tx: 187.5, vx: 0, y: o.view.cy, ty: y0, vy: 0, L: 4, Lt: 4, Lv: 0, th: 0, thv: 0, open: 0, opent: 1.1 });
+  [cableEl, clawEl].forEach((e) => anim(e, [{ opacity: 0 }, { opacity: 1 }], { duration: 160, easing: EASE.in }));
   hap('tick');
   await cableTo(L.cy - 30 - cableTop(), r);
-  hap('land', 0.5);
-  Q.opent = -0.05; await wait(160, r);
+  hap('land', 0.6);
+  anim(card, [{ scale: '1' }, { scale: '1.02 .95', offset: 0.3 }, { scale: '1' }], { duration: 380, easing: EASE.pop });   // (the squeeze)
+  Q.opent = -0.08; await wait(150, r);
   hap('snap');
   C.carriedEl = card; C.tilt = 0; C.frozen = true;
-  card.getAnimations().forEach((a) => a.cancel()); card.style.transformOrigin = '50% 0'; card.style.zIndex = '20';
-  speak('Gotcha! 🎉');
+  card.style.transformOrigin = '50% 0'; card.style.zIndex = '20';
   o.setState('greeting');
-  // the others drop away, the controls clear out (25 ms stagger), the card is lifted with a swing
-  cards.filter((c) => c !== card).forEach((c, i) => {
-    const m = new DOMMatrix(getComputedStyle(c).transform), side = m.m41 < 0 ? -1 : 1;
-    anim(c, [{ transform: c.style.transform, opacity: +c.style.opacity || 1 }, { transform: `${c.style.transform} translate3d(${side * 30}px, 520px, 0) rotateZ(${side * (14 + i * 4)}deg)`, opacity: 0 }], { duration: 620, easing: EASE.fall, delay: i * 25 });
+  // 4 · the neighbours slide off sideways; the coupon is lifted, swinging a little
+  cards.filter((c) => c !== card).forEach((c) => {
+    const side = new DOMMatrix(getComputedStyle(c).transform).m41 < 0 ? -1 : 1;
+    anim(c, [{ translate: '0 0', opacity: +c.style.opacity || 1 }, { translate: `${side * 220}px 20px`, opacity: 0 }], { duration: 460, easing: EASE.out });
   });
-  [copyEl, grabBtn].forEach((el, i) => anim(el, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(26px)' }], { duration: 200, easing: EASE.out, delay: i * 25 }));
-  setTimeout(() => alive(r) && hap('land', 0.4), 420);
-  Q.ty = y0 - 26; Q.tx = 187.5 + 18; Q.Lt = Math.max(30, Q.L - 52);
-  await wait(240, r); Q.tx = 187.5;
-  await wait(520, r);
-  await toDiscover(target, card, r);
+  Q.ty = y0 - 34; Q.tx = 187.5 + 16; Q.Lt = Math.max(28, Q.L - 64);
+  await wait(200, r); Q.tx = 187.5;
+  // 5 · the win: a soft lavender glow blooms behind the coupon, confetti bursts out of it, the bot cheers
+  await wait(260, r);
+  const cr = card.getBoundingClientRect(), sr = sheet.getBoundingClientRect(), k = 375 / sr.width;
+  const gx = (cr.left + cr.width / 2 - sr.left) * k, gy = (cr.top + cr.height / 2 - sr.top) * k;
+  winGlow(gx, gy); confettiBurst(gx, gy - 40);
+  hap('success'); o.hop(1.8);
+  await wait(620, r);
+  await landOnPage(target, card, r);
+}
+function winGlow(x, y) {
+  const g = document.createElement('i'); g.className = 'st-win'; g.style.left = `${x - 210}px`; g.style.top = `${y - 210}px`; st.appendChild(g);
+  anim(g, [{ transform: 'scale(.4)', opacity: 0 }, { transform: 'scale(1)', opacity: 1, offset: 0.35 }, { transform: 'scale(1.35)', opacity: 0 }], { duration: 1500, easing: 'cubic-bezier(.2,.7,.2,1)' })
+    .finished.then(() => g.remove(), () => g.remove());
+}
+function confettiBurst(x, y) {
+  confetti.innerHTML = '';
+  const cols = ['#FEEE00', '#A696FF', '#270A71', '#FFFFFF', '#7C6FD0', '#FFD23C'];
+  for (let i = 0; i < 40; i++) {
+    const e = document.createElement('i'); e.style.background = cols[i % cols.length]; if (i % 4 === 0) e.style.borderRadius = '50%'; confetti.appendChild(e);
+    const a = -Math.PI / 2 + (Math.random() - 0.5) * 2.4, v = 340 + Math.random() * 460, T = 1.2 + Math.random() * 0.5, spin = (i % 2 ? 1 : -1) * (300 + Math.random() * 400);
+    const pts = []; for (let n = 0; n <= 8; n++) { const t = (n / 8) * T; pts.push({ transform: `translate(${(x + Math.cos(a) * v * t).toFixed(1)}px, ${(y + Math.sin(a) * v * t + 820 * t * t).toFixed(1)}px) rotate(${(spin * t).toFixed(0)}deg) scale(${(1 - n / 18).toFixed(2)})`, opacity: n > 5 ? (8 - n) / 3 : 1 }); }
+    anim(e, pts, { duration: T * 1000, easing: 'linear' }).finished.then(() => e.remove(), () => e.remove());
+  }
 }
 
-// ─── 4 · the full-screen transition: the card floods the screen in its colour, flips, becomes the hero ───
+// ─── 4 · the landing: the grabbed coupon becomes the end page's hero card (a shared-element morph) ─────────
 let discoverSet = null;
-async function toDiscover(set, card, r) {
+const MORPH = 'cubic-bezier(0.32, 0.72, 0, 1)';                       // a long, soft settle for the big move
+async function landOnPage(set, card, r) {
   phase = 'tx';
   const o = window.orbi;
   hush();
-  const s = sheet.getBoundingClientRect(), cr = card.getBoundingClientRect(), Hh = sheet.clientHeight;
-  const k = 375 / s.width;                                          // (screen px → layout px)
-  const cx = (cr.left + cr.width / 2 - s.left) * k, cy = (cr.top + cr.height / 2 - s.top) * k;
-  // the flying card: a copy with a back (the next page's title), started exactly where the claw holds it
-  const fc = document.createElement('div');
-  fc.className = 'tx-card'; fc.setAttribute('style', card.getAttribute('style').replace(/transform[^;]*;?/g, '').replace(/opacity[^;]*;?/g, '').replace(/z-index[^;]*;?/g, '')); fc.style.setProperty('--g', set.grad);
-  fc.innerHTML = `<div class="tx-front">${card.innerHTML}</div><div class="tx-back"><div><b>${set.name}</b><small>PICK OF THE DAY</small></div></div>`;
-  tx.appendChild(fc); tx.style.setProperty('--g', set.grad); tx.classList.add('is-on');
-  flood.style.clipPath = `circle(0px at ${cx}px ${cy}px)`;
+  const sr = sheet.getBoundingClientRect(), k = 375 / sr.width, cr = card.getBoundingClientRect();
+  const c0 = { x: (cr.left + cr.width / 2 - sr.left) * k, y: (cr.top + cr.height / 2 - sr.top) * k };
   const rot0 = -Q.th * 57.2958 + C.tilt;
-  const at = (x, y, sc, ry, rz = 0) => `translate(${(x - CW / 2).toFixed(1)}px, ${(y - CH / 2).toFixed(1)}px) rotateZ(${rz}deg) rotateY(${ry}deg) scale(${sc})`;
-  card.style.visibility = 'hidden';
-  // the claw lets go and reels back into Orbi
-  Q.opent = 1; Q.Lt = 0; hap('pop');
-  [cableEl, clawEl].forEach((e) => anim(e, [{ opacity: 1 }, { opacity: 0 }], { duration: 260, easing: EASE.out, delay: 120 }));
-  const ex = 187.5, ey = Hh * 0.46;
-  // the card: to the middle, turning over (MOVE, a touch longer for the flip), growing
-  const fly = anim(fc, [{ transform: at(cx, cy, 1, 0, rot0.toFixed(2)) }, { transform: at(ex, ey, 1.28, 180) }], { duration: 1000, easing: HAS_LINEAR ? linearOf(10, 0.8, 1000) : EASE.move });
-  // the flood: a circle in the card's colour from the card's centre to past the corners (EXPAND)
-  const R = Math.hypot(Math.max(cx, 375 - cx), Math.max(cy, Hh - cy)) + 20;
-  const fl = anim(flood, [{ clipPath: `circle(0px at ${cx}px ${cy}px)` }, { clipPath: `circle(${R}px at ${cx}px ${cy}px)` }], { duration: 560, easing: EASE.expand, delay: 90 });
-  // light rays spin up behind the card, sparkles burst out of it
-  anim(rays, [{ opacity: 0, transform: `translate(${ex - 187.5}px, ${ey - Hh / 2}px) rotate(0deg) scale(.6)` }, { opacity: 0.95, transform: `translate(${ex - 187.5}px, ${ey - Hh / 2}px) rotate(40deg) scale(1)`, offset: 0.4 }, { opacity: 0, transform: `translate(${ex - 187.5}px, ${ey - Hh / 2}px) rotate(80deg) scale(1.15)` }], { duration: 1500, easing: 'cubic-bezier(.33,.6,.4,1)', delay: 160 });
-  sparkBurst(ex, ey, r);
-  setTimeout(() => alive(r) && hap('snap'), 420);
-  Q.follow = false;
-  o.stage({ cx: 338, cy: 74, unit: 15 }); o.gazeAt(-0.2, 0.25);          // (top right of the offers page header)
-  setTimeout(() => alive(r) && o.hop(2), 380);
-  await done(fly, r);
-  await done(fl, r).catch(() => {});
-  C.loop = false; Q.on = false;
-  // the hand-off: the page arrives under the flood (its hero is the same colour), the card's back rises and
-  // dissolves into the hero's title, the flood fades away
+  // the end page arrives see-through, its hero held back (the coupon is about to become it)
   discoverSet = set;
-  st.classList.remove('is-on');
-  disc.show(set);
-  fc.querySelector('.tx-front').style.visibility = 'hidden';
-  anim(fc, [{ transform: at(ex, ey, 1.28, 180) }, { transform: at(ex, ey - 40, 1.6, 180) }], { duration: 300, easing: EASE.out });
-  anim(fc.querySelector('.tx-back'), [{ opacity: 1 }, { opacity: 0 }], { duration: 300, easing: EASE.out });
-  const fo = anim(flood, [{ opacity: 1 }, { opacity: 0 }], { duration: 320, easing: EASE.out, delay: 80 });
-  hap('success');
-  await done(fo, r).catch(() => {});
-  tx.classList.remove('is-on'); fc.remove(); flood.getAnimations().forEach((a) => a.cancel()); flood.style.clipPath = '';
+  const hero = disc.show(set, { land: true });
+  // the flying coupon: a white box from the claw's grip to the hero card's place; the coupon's own face fades as
+  // it travels, the hero's face fades in under it as it lands
+  const fc = document.createElement('div');
+  fc.className = 'lx'; fc.innerHTML = `<div class="lx-in">${card.innerHTML}</div>`;
+  const box = (x, y, w, h, rd, rot) => ({ left: `${(x - w / 2).toFixed(1)}px`, top: `${(y - h / 2).toFixed(1)}px`, width: `${w}px`, height: `${h}px`, borderRadius: `${rd}px`, transform: `rotate(${rot}deg)` });
+  const from = box(c0.x, c0.y, CW, CH, 23.234, rot0.toFixed(2)), to = box(hero.x + hero.w / 2, hero.y + hero.h / 2, hero.w, hero.h, 22, 0);
+  Object.assign(fc.style, from); root.appendChild(fc);
+  card.style.visibility = 'hidden';
+  // the claw lets go and reels back up; the bot heads for the page's header
+  Q.opent = 1.1; Q.Lt = 0; Q.follow = false; hap('pop');
+  [cableEl, clawEl].forEach((e) => anim(e, [{ opacity: 1 }, { opacity: 0 }], { duration: 220, easing: EASE.out, delay: 80 }));
+  o.stage({ cx: 338, cy: 74, unit: 15 }); o.gazeAt(-0.25, 0.2);
+  const ms = reduce.matches ? 200 : 780;
+  const fly = anim(fc, [{ ...from, boxShadow: '0 20px 50px rgba(39,10,113,.22)' }, { ...to, boxShadow: '0 8px 24px rgba(16,22,40,.07)' }], { duration: ms, easing: MORPH });
+  anim(fc, [{ backgroundColor: '#FFFFFF', offset: 0 }, { backgroundColor: '#FFFFFF', offset: 0.42 }, { backgroundColor: 'rgba(255,255,255,0)', offset: 0.86 }, { backgroundColor: 'rgba(255,255,255,0)' }], { duration: ms, easing: 'linear' });
+  anim(fc.firstChild, [{ opacity: 1, transform: 'translateX(-50%) scale(1)' }, { opacity: 1, offset: 0.22 }, { opacity: 0, transform: 'translateX(-50%) translateY(-10px) scale(1.12)' }], { duration: ms * 0.62, easing: 'cubic-bezier(.33,0,.4,1)' });
+  disc.land(ms);                                                   // (the page's ground, header and hero come up as it flies)
+  await done(fly, r);                                             // (a close mid-flight throws 'stale' here — the page resets)
+  hap('success'); o.hop(1.4);
+  // the coupon's box hands over to the hero card (same box, same place) and the rest of the page rises in
+  const fo = anim(fc, [{ opacity: 1 }, { opacity: 0 }], { duration: 200, easing: EASE.out });
+  C.loop = false; Q.on = false; st.classList.remove('is-on');
+  await done(fo, r);
+  fc.remove();
   phase = 'discover';
-}
-function sparkBurst(x, y, r) {
-  sparks.innerHTML = '';
-  for (let i = 0; i < 28; i++) {
-    const e = document.createElement('i'); sparks.appendChild(e);
-    const a = (i / 28) * Math.PI * 2 + Math.random() * 0.3, d = 110 + Math.random() * 190, sz = 0.5 + Math.random() * 1.1;
-    anim(e, [{ transform: `translate(${x}px, ${y}px) scale(0)`, opacity: 0 }, { transform: `translate(${x + Math.cos(a) * d * 0.55}px, ${y + Math.sin(a) * d * 0.55}px) scale(${sz})`, opacity: 1, offset: 0.35 },
-      { transform: `translate(${x + Math.cos(a) * d}px, ${y + Math.sin(a) * d}px) scale(0)`, opacity: 0 }], { duration: 900 + Math.random() * 500, easing: 'cubic-bezier(.2,.7,.3,1)', delay: 180 + Math.random() * 120 });
-  }
 }
 
 // ─── 5 · the discovery page (claw/discover.js), and the ways out of it ───────────────────────────────────
@@ -516,7 +520,7 @@ function reset() {
   clearTimeout(sayHideT);
   root.querySelectorAll('*').forEach((e) => e.getAnimations && e.getAnimations().forEach((a) => a.cancel()));
   story.innerHTML = ''; say.textContent = ''; burst.innerHTML = ''; confetti.innerHTML = ''; sparks.innerHTML = '';
-  st.classList.remove('is-on'); tx.classList.remove('is-on'); tx.querySelectorAll('.tx-card').forEach((e) => e.remove());
+  st.classList.remove('is-on'); tx.classList.remove('is-on'); root.querySelectorAll('.tx-card, .lx, .st-win').forEach((e) => e.remove());
   disc.hide({ instant: true }); expander.style.display = 'none';
   Object.assign(C, { carriedEl: null, frozen: false, drag: null, spin: null, focus: -1 });
   cards.forEach((c) => { c.style.visibility = ''; c.style.transformOrigin = ''; });

@@ -192,3 +192,8 @@
 .op .dv-all { margin: 0; font: 600 14px/20px var(--noon); color: #0F61FF; width: auto; }
 
 @media (prefers-reduced-motion: reduce) { .op-hint img { animation: none; opacity: .7; } }
+
+/* the landing (claw.js landOnPage): see-through while the coupon flies in to become the hero card */
+.dv.op.is-landing { background: transparent; }
+.op.is-landing .op-glow, .op.is-landing .op-head, .op.is-landing .op-hero, .op.is-landing .op-hero-sec .op-title,
+.op.is-landing .op-rv, .op.is-landing .op-end { opacity: 0; }

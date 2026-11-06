@@ -1485,12 +1485,12 @@ const PAGE_SPRING = { omega: 9, zeta: 0.92 };              // opening: slower an
 const PAGE_CLOSE = { omega: 11, zeta: 0.95 };               // closing: a touch quicker and near-critical (≈0.3 px over) — exits land quietly, no bounce at the FAB
 // the 360° on the way up turns on its own softer spring from the same frame (the colour spin's: ω 11, ζ .86, a light
 // push), so it's face-on just after the bot lands — a follow-through, not a whip (tied to the page it took 250 ms)
-const PAGE_TURN = { omega: 7.5, zeta: 0.86, kick: 2.2 };
+const PAGE_TURN = { omega: 9, zeta: 0.86, kick: 2.6 };
 // a tap (open, ✕, Escape) plays a timed curve instead of the spring: a spring from rest leaps off the mark (half way in
 // 175 ms) — this one leaves gently and settles long. Swipes keep the spring / glide with the finger's speed.
 // (0.4, 0, 0.2, 1): an even lift-off and a long, quiet settle — its peak speed is ~2× the average, where (0.45, 0, 0.12, 1)
 // spiked to ~2.6× mid-way and read as a lurch
-const PAGE_CURVE = { open: { ms: 1000, ease: cubicBezier(0.4, 0, 0.2, 1) }, close: { ms: 760, ease: cubicBezier(0.4, 0, 0.2, 1) } };
+const PAGE_CURVE = { open: { ms: 760, ease: cubicBezier(0.4, 0, 0.2, 1) }, close: { ms: 580, ease: cubicBezier(0.4, 0, 0.2, 1) } };
 const UNDER = { dim: 0.1 };
 let arcLUT = null;                                           // arc length → bezier u, so the bot's speed is the ease's, not the curve's
 function flightAt(e) {                                       // the bot's arc, Home spot (e 0) → rest on the page (e 1)

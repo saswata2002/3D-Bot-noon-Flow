@@ -1486,6 +1486,9 @@ const PAGE_CLOSE = { omega: 11, zeta: 0.95 };               // closing: a touch 
 // the 360° on the way up turns on its own softer spring from the same frame (the colour spin's: ω 11, ζ .86, a light
 // push), so it's face-on just after the bot lands — a follow-through, not a whip (tied to the page it took 250 ms)
 const PAGE_TURN = { omega: 7.5, zeta: 0.86, kick: 2.2 };
+// a tap (open, ✕, Escape) plays a timed curve instead of the spring: a spring from rest leaps off the mark (half way in
+// 175 ms) — this one leaves gently and settles long. Swipes keep the spring / glide with the finger's speed.
+const PAGE_CURVE = { open: { ms: 900, ease: cubicBezier(0.45, 0, 0.12, 1) }, close: { ms: 680, ease: cubicBezier(0.42, 0, 0.18, 1) } };
 const UNDER = { dim: 0.1 };
 function flightAt(e) {                                       // the bot's arc, Home spot (e 0) → rest on the page (e 1)
   const a = VIEW.home, b = VIEW.page;
@@ -1511,6 +1514,7 @@ function goPage(open, { settle = false, v0 = 0, glide = 0, fade = false } = {}) 
   const here = { ...view }, arc0 = flightAt(pageNav.p);
   pageNav.anim = { x: pageNav.p, v: v0, to: open ? 1 : 0, spin: fromHome, s: Math.PI * 2, sv: -PAGE_TURN.kick, x0: pageNav.p,
     glide: glide ? { T: glide, t: 0, v0 } : null,         // a slow swipe's release: a curve that starts at the finger's speed
+    curve: !glide && !v0 && !settle ? { ...(open ? PAGE_CURVE.open : PAGE_CURVE.close), t: 0 } : null,
     off: { cx: here.cx - arc0.cx, cy: here.cy - arc0.cy, unit: here.unit - arc0.unit }, last: 0, prev: here };
   pageNav.show = fromHome ? pageNav.anim : null;             // (a scripted turn: the yaw spring stays out of it)
   pageNav.lift = 0;
@@ -1572,7 +1576,13 @@ function stepPage(now) {
   const a = pageNav.anim;
   const dt = Math.min(0.05, a.last ? (now - a.last) / 1000 : 1 / 60); a.last = now;
   const sp = a.to === 1 ? PAGE_SPRING : PAGE_CLOSE, w = sp.omega, z = sp.zeta, ws = PAGE_TURN.omega, zs = PAGE_TURN.zeta;
-  if (a.glide) {
+  if (a.curve) {
+    const c = a.curve, T = c.ms / 1000; c.t = Math.min(T, c.t + dt);
+    const u = c.t / T, x = a.x0 + (a.to - a.x0) * c.ease(u);
+    a.v = (x - a.x) / Math.max(dt, 1e-3); a.x = x;
+    if (u >= 1) { a.x = a.to; a.v = 0; }
+    if (a.spin) for (let left = dt; left > 1e-6; left -= 1 / 240) { const h = Math.min(left, 1 / 240); a.sv += (-ws * ws * a.s - 2 * zs * ws * a.sv) * h; a.s += a.sv * h; }
+  } else if (a.glide) {
     // cubic Hermite: from where the finger let go, at the finger's speed, easing to rest on the target (no jolt
     // on release, and the bot still lands softly)
     const g = a.glide; g.t = Math.min(g.T, g.t + dt);

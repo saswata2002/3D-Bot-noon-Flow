@@ -1631,7 +1631,7 @@ function restoreVisorNow() {
   if (pageNav.restoreVisor && !helmet.visorDown) setVisor(true);
   pageNav.restoreVisor = false;
 }
-// ─── stage: the experience on the page (claw/claw.js) places the bot ─────────
+// ─── stage: an experience on the page can place the bot (window.orbi.stage) ──
 // orbi.stage({ cx, cy, unit }, { snap }) — while the page is open and still, the bot goes there: on a soft spring
 // (ω 11, ζ .9), or glued to it every frame (`snap`, for riding the claw machine's carriage). orbi.stage(null)
 // hands it back to its rest spot. orbi.lock(true): a tap on it is a playful hop, not a spin/drag/carry.

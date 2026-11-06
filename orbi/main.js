@@ -1488,7 +1488,9 @@ const PAGE_CLOSE = { omega: 11, zeta: 0.95 };               // closing: a touch 
 const PAGE_TURN = { omega: 7.5, zeta: 0.86, kick: 2.2 };
 // a tap (open, ✕, Escape) plays a timed curve instead of the spring: a spring from rest leaps off the mark (half way in
 // 175 ms) — this one leaves gently and settles long. Swipes keep the spring / glide with the finger's speed.
-const PAGE_CURVE = { open: { ms: 900, ease: cubicBezier(0.45, 0, 0.12, 1) }, close: { ms: 680, ease: cubicBezier(0.42, 0, 0.18, 1) } };
+// (0.4, 0, 0.2, 1): an even lift-off and a long, quiet settle — its peak speed is ~2× the average, where (0.45, 0, 0.12, 1)
+// spiked to ~2.6× mid-way and read as a lurch
+const PAGE_CURVE = { open: { ms: 1000, ease: cubicBezier(0.4, 0, 0.2, 1) }, close: { ms: 760, ease: cubicBezier(0.4, 0, 0.2, 1) } };
 const UNDER = { dim: 0.1 };
 function flightAt(e) {                                       // the bot's arc, Home spot (e 0) → rest on the page (e 1)
   const a = VIEW.home, b = VIEW.page;
@@ -1558,8 +1560,9 @@ function placePage() {
   const R = Math.hypot(Math.max(cx, W - cx), Math.max(cy, Hh - cy)) + 2;
   const pageTop = 0;
   // (radius ∝ p^1.6: the circle swells out of the ball before it races to the corners — linear covered the frame in ~100 ms)
-  const q = THREE.MathUtils.clamp(p, 0, 1.05), qs = q * q * (3 - 2 * Math.min(q, 1));   // smoothstep: eases out of the ball and into the corners
-  const rr = pageNav.fade ? R : r0 + (R - r0) * qs;
+  // (the radius follows p directly — p is already eased; a second ease on top doubled the mid-way speed and the circle
+  // lurched across the screen. A circle's area grows with r², so linear r already swells gently out of the ball)
+  const rr = pageNav.fade ? R : r0 + (R - r0) * THREE.MathUtils.clamp(p, 0, 1.05);
   sheetEl.style.transform = '';
   sheetEl.style.clipPath = rr >= R ? 'none' : `circle(${rr.toFixed(1)}px at ${cx.toFixed(1)}px ${cy.toFixed(1)}px)`;
   sheetEl.style.opacity = pageNav.fade ? THREE.MathUtils.clamp(p * 1.6 - 0.25, 0, 1).toFixed(3) : '';   // gone a little before Home is back

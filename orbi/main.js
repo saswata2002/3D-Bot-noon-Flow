@@ -1492,11 +1492,24 @@ const PAGE_TURN = { omega: 7.5, zeta: 0.86, kick: 2.2 };
 // spiked to ~2.6× mid-way and read as a lurch
 const PAGE_CURVE = { open: { ms: 1000, ease: cubicBezier(0.4, 0, 0.2, 1) }, close: { ms: 760, ease: cubicBezier(0.4, 0, 0.2, 1) } };
 const UNDER = { dim: 0.1 };
+let arcLUT = null;                                           // arc length → bezier u, so the bot's speed is the ease's, not the curve's
 function flightAt(e) {                                       // the bot's arc, Home spot (e 0) → rest on the page (e 1)
   const a = VIEW.home, b = VIEW.page;
   // leaves upward (a little left), swings in to the centre from the right — a soft, single curve
   const c1 = { cx: a.cx - 12, cy: a.cy - (a.cy - b.cy) * 0.55 }, c2 = { cx: b.cx + 64, cy: b.cy + 90 };
-  return { cx: bez(a.cx, c1.cx, c2.cx, b.cx, e), cy: bez(a.cy, c1.cy, c2.cy, b.cy, e), unit: THREE.MathUtils.lerp(a.unit, b.unit, THREE.MathUtils.clamp(e, 0, 1)) };
+  const key = `${a.cx},${a.cy},${b.cx},${b.cy}`;
+  if (!arcLUT || arcLUT.key !== key) {
+    const n = 64, len = [0]; let px = a.cx, py = a.cy;
+    for (let i = 1; i <= n; i++) { const u = i / n, x = bez(a.cx, c1.cx, c2.cx, b.cx, u), y = bez(a.cy, c1.cy, c2.cy, b.cy, u); len.push(len[i - 1] + Math.hypot(x - px, y - py)); px = x; py = y; }
+    arcLUT = { key, n, len, total: len[n] };
+  }
+  // (outside 0…1 — a swipe past the ends — keep the plain parameter)
+  let u = e;
+  if (e > 0 && e < 1) {
+    const L = arcLUT, d = e * L.total; let i = 1; while (i < L.n && L.len[i] < d) i++;
+    u = (i - 1 + (d - L.len[i - 1]) / Math.max(1e-6, L.len[i] - L.len[i - 1])) / L.n;
+  }
+  return { cx: bez(a.cx, c1.cx, c2.cx, b.cx, u), cy: bez(a.cy, c1.cy, c2.cy, b.cy, u), unit: THREE.MathUtils.lerp(a.unit, b.unit, THREE.MathUtils.clamp(e, 0, 1)) };
 }
 const pageEvent = (name) => dispatchEvent(new CustomEvent('orbi:page', { detail: name }));
 function goPage(open, { settle = false, v0 = 0, glide = 0, fade = false } = {}) {

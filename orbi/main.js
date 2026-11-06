@@ -1553,7 +1553,8 @@ function placePage() {
   const cx = view.cx, cy = view.cy, r0 = view.unit * 1.2;
   const R = Math.hypot(Math.max(cx, W - cx), Math.max(cy, Hh - cy)) + 2;
   const pageTop = 0;
-  const rr = pageNav.fade ? R : r0 + (R - r0) * THREE.MathUtils.clamp(p, 0, 1.05);
+  // (radius ∝ p^1.6: the circle swells out of the ball before it races to the corners — linear covered the frame in ~100 ms)
+  const rr = pageNav.fade ? R : r0 + (R - r0) * Math.pow(THREE.MathUtils.clamp(p, 0, 1.05), 1.6);
   sheetEl.style.transform = '';
   sheetEl.style.clipPath = rr >= R ? 'none' : `circle(${rr.toFixed(1)}px at ${cx.toFixed(1)}px ${cy.toFixed(1)}px)`;
   sheetEl.style.opacity = pageNav.fade ? THREE.MathUtils.clamp(p * 1.6 - 0.25, 0, 1).toFixed(3) : '';   // gone a little before Home is back

@@ -1471,13 +1471,13 @@ function setSheetLive(on) {                                  // layering + a11y 
   if (on) sheetEl.removeAttribute('inert'); else sheetEl.setAttribute('inert', '');
   sheetEl.setAttribute('aria-hidden', String(!pageNav.open));
   canvas.classList.toggle('on-page', on); hit.classList.toggle('on-page', on);
-  card.classList.toggle('is-lifted', on);
 }
 // ─── the full page: ONE spring (noon motion — "one curve, one start frame") ───
 // Everything is one progress p (0 Home → 1 the page) on noon's MOVE spring (stiffness 280.6, damping 27.14:
 // ω 16.75, ζ .81 — 1.3 % overshoot, ≈544 ms), started in the tap's frame and driven by the same p:
-//   the page        y 100 % → 0 (never past the top — its bottom edge would lift off the frame)
-//   Home under it   scale 1 → .94, corners → 24 (own 200 ms clock), dimmed to 85 %  (noon's full-page modal)
+//   the page        a circle that grows out of the bot (clip-path, centred on the bot as it flies) until it covers
+//                   the frame — a portal from the bot (2026-11-06; it used to rise from the bottom)
+//   Home under it   stays put (no scale, no corners), dimmed to 90 % as the circle grows over it
 //   the bot         one arc from its spot to its rest at the page's top, growing to its page size, turning its
 //                   approved 360° on the way up, leaning into the motion; then visor (if down) → hello
 // Closing is the same spring back (carrying a swipe's velocity); a swipe follows the finger 1:1.
@@ -1486,7 +1486,7 @@ const PAGE_CLOSE = { omega: 18, zeta: 0.92 };               // closing: a touch 
 // the 360° on the way up turns on its own softer spring from the same frame (the colour spin's: ω 11, ζ .86, a light
 // push), so it's face-on just after the bot lands — a follow-through, not a whip (tied to the page it took 250 ms)
 const PAGE_TURN = { omega: 11, zeta: 0.86, kick: 3 };
-const UNDER = { scale: 0.94, dim: 0.15 };
+const UNDER = { dim: 0.1 };
 function flightAt(e) {                                       // the bot's arc, Home spot (e 0) → rest on the page (e 1)
   const a = VIEW.home, b = VIEW.page;
   // leaves upward (a little left), swings in to the centre from the right — a soft, single curve
@@ -1543,20 +1543,23 @@ function fitFrame() {
 
 function placePage() {
   const p = pageNav.p, pc = THREE.MathUtils.clamp(p, 0, 1);  // the sheet may overshoot; card + scrim stop at 1
-  if (pc > 0) {                                              // Home recedes under the page: scale about its centre
-    const sc = 1 - (1 - UNDER.scale) * pc, W = screenEl.clientWidth || 375, Hh = screenEl.clientHeight || 812;
-    card.style.transform = `translate(${(W * (1 - sc) / 2).toFixed(3)}px, ${(Hh * (1 - sc) / 2).toFixed(3)}px) scale(${sc.toFixed(5)})`;
-  } else card.style.transform = '';
-  scrim.style.opacity = (UNDER.dim * pc).toFixed(4);          // chained to the page (85 % brightness at rest)
+  card.style.transform = '';                                 // Home stays exactly where it is
+  scrim.style.opacity = (UNDER.dim * pc).toFixed(4);          // chained to the page (90 % brightness at rest)
 
-  // (a full page never rises past the top: its bottom edge would lift off the frame and show Home under it)
-  const pageTop = pageNav.fade ? 0 : Math.max(0, (1 - p) * SHEET.travel) + pageNav.lift;
-  sheetEl.style.transform = `translateY(${pageTop.toFixed(2)}px)`;
+  // the page: a circle out of the bot — centred on it wherever it is on its flight, from just around the ball to
+  // past the farthest corner of the frame (so the same p that flies the bot opens the page)
+  frameView();
+  const W = screenEl.clientWidth || 375, Hh = screenEl.clientHeight || 812;
+  const cx = view.cx, cy = view.cy, r0 = view.unit * 1.2;
+  const R = Math.hypot(Math.max(cx, W - cx), Math.max(cy, Hh - cy)) + 2;
+  const pageTop = 0;
+  const rr = pageNav.fade ? R : r0 + (R - r0) * THREE.MathUtils.clamp(p, 0, 1.05);
+  sheetEl.style.transform = '';
+  sheetEl.style.clipPath = rr >= R ? 'none' : `circle(${rr.toFixed(1)}px at ${cx.toFixed(1)}px ${cy.toFixed(1)}px)`;
   sheetEl.style.opacity = pageNav.fade ? THREE.MathUtils.clamp(p * 1.6 - 0.25, 0, 1).toFixed(3) : '';   // gone a little before Home is back
   // the status bar: dark content on the (light, noon DS) page; the page's content can ask for light content over a
   // dark surface (orbi.statusInk), applied once the page is under the bar
-  if (sbar) sbar.style.setProperty('--sb-ink', (inkOverride != null && !pageNav.fade ? inkOverride * THREE.MathUtils.clamp((46 - pageTop) / 30, 0, 1) : 0).toFixed(3));
-  frameView();
+  if (sbar) sbar.style.setProperty('--sb-ink', (inkOverride != null && !pageNav.fade ? inkOverride * THREE.MathUtils.clamp((46 - pageTop) / 30, 0, 1) * pc : 0).toFixed(3));
   const s = view.unit / 30;                                  // the Figma frame box (80 at unit 30)
   const pad = 16 * pc;                                       // on the sheet: room for the raised visor (it rises above the frame)
   hit.style.left = `${(view.cx - 40 * s - pad).toFixed(2)}px`;

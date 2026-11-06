@@ -1481,11 +1481,11 @@ function setSheetLive(on) {                                  // layering + a11y 
 //   the bot         one arc from its spot to its rest at the page's top, growing to its page size, turning its
 //                   approved 360° on the way up, leaning into the motion; then visor (if down) → hello
 // Closing is the same spring back (carrying a swipe's velocity); a swipe follows the finger 1:1.
-const PAGE_SPRING = { omega: 16.75, zeta: 0.81 };           // opening: noon MOVE
-const PAGE_CLOSE = { omega: 18, zeta: 0.92 };               // closing: a touch quicker and near-critical (≈0.3 px over) — exits land quietly, no bounce at the FAB
+const PAGE_SPRING = { omega: 9, zeta: 0.92 };              // opening: slower and softer than MOVE (2026-11-06: the circle reveal felt rushed) — ≈0.9 s, no overshoot
+const PAGE_CLOSE = { omega: 11, zeta: 0.95 };               // closing: a touch quicker and near-critical (≈0.3 px over) — exits land quietly, no bounce at the FAB
 // the 360° on the way up turns on its own softer spring from the same frame (the colour spin's: ω 11, ζ .86, a light
 // push), so it's face-on just after the bot lands — a follow-through, not a whip (tied to the page it took 250 ms)
-const PAGE_TURN = { omega: 11, zeta: 0.86, kick: 3 };
+const PAGE_TURN = { omega: 7.5, zeta: 0.86, kick: 2.2 };
 const UNDER = { dim: 0.1 };
 function flightAt(e) {                                       // the bot's arc, Home spot (e 0) → rest on the page (e 1)
   const a = VIEW.home, b = VIEW.page;
@@ -1544,7 +1544,7 @@ function fitFrame() {
 function placePage() {
   const p = pageNav.p, pc = THREE.MathUtils.clamp(p, 0, 1);  // the sheet may overshoot; card + scrim stop at 1
   card.style.transform = '';                                 // Home stays exactly where it is
-  scrim.style.opacity = (UNDER.dim * pc).toFixed(4);          // chained to the page (90 % brightness at rest)
+  scrim.style.opacity = (UNDER.dim * pc * pc).toFixed(4);          // chained to the page (90 % brightness at rest)
 
   // the page: a circle out of the bot — centred on it wherever it is on its flight, from just around the ball to
   // past the farthest corner of the frame (so the same p that flies the bot opens the page)
@@ -1554,7 +1554,8 @@ function placePage() {
   const R = Math.hypot(Math.max(cx, W - cx), Math.max(cy, Hh - cy)) + 2;
   const pageTop = 0;
   // (radius ∝ p^1.6: the circle swells out of the ball before it races to the corners — linear covered the frame in ~100 ms)
-  const rr = pageNav.fade ? R : r0 + (R - r0) * Math.pow(THREE.MathUtils.clamp(p, 0, 1.05), 1.6);
+  const q = THREE.MathUtils.clamp(p, 0, 1.05), qs = q * q * (3 - 2 * Math.min(q, 1));   // smoothstep: eases out of the ball and into the corners
+  const rr = pageNav.fade ? R : r0 + (R - r0) * qs;
   sheetEl.style.transform = '';
   sheetEl.style.clipPath = rr >= R ? 'none' : `circle(${rr.toFixed(1)}px at ${cx.toFixed(1)}px ${cy.toFixed(1)}px)`;
   sheetEl.style.opacity = pageNav.fade ? THREE.MathUtils.clamp(p * 1.6 - 0.25, 0, 1).toFixed(3) : '';   // gone a little before Home is back
